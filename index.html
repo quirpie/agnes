@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0e0f11;--panel:#16171a;--panel2:#1d1e22;--line:#2a2c31;--txt:#e7e7e9;--mute:#8b8e96;--acc:#f0a53a;--blue:#5aa9ff;--src:#3fbfa6;--flt:#5aa9ff;--attr:#f0a53a;--mix:#b18cff;--code:#ff7a8a;--wire:#7f8bb8}
+:root{--bg:#0e0f11;--panel:#16171a;--panel2:#1d1e22;--line:#2a2c31;--txt:#e7e7e9;--mute:#8b8e96;--acc:#f0a53a;--blue:#5aa9ff;--src:#3fbfa6;--flt:#5aa9ff;--attr:#f0a53a;--mix:#b18cff;--code:#ff7a8a;--fx:#9be15d;--wire:#7f8bb8}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.35 Inter,system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
 body{display:flex;flex-direction:column}
@@ -97,11 +97,32 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
 .dotw{display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4d7de;vertical-align:-1px}
 .sq{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--attr);vertical-align:-1px}
 .fatal{padding:30px;color:#ffb3bb}
-#exp{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
-#exp[hidden]{display:none}
-#exp .sheet{width:100%;max-width:400px;max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-#exp .note{color:var(--mute);font-size:12px;margin-bottom:8px}
-#exp .btns{display:flex;gap:8px}
+#exp,#fxDlg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
+#exp[hidden],#fxDlg[hidden]{display:none}
+#exp .sheet,#fxDlg .sheet{width:100%;max-width:400px;max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#exp .note,#fxDlg .note{color:var(--mute);font-size:12px;margin-bottom:8px}
+#exp .btns,#fxDlg .btns{display:flex;gap:8px}
+#fxDlg .sheet{max-width:460px}
+#fxDlg .btns>*{flex:1}
+#fxDlg .filepick button{width:100%;height:38px;justify-content:center}
+#fxDlg textarea.code{min-height:120px;margin-top:8px}
+#fxPasteBtn{width:100%;height:38px;justify-content:center;margin-top:8px}
+#fxMsg{font-size:12px;margin-top:8px;white-space:pre-wrap;line-height:1.45}
+#fxMsg .bad{color:#ff9ea8}#fxMsg .good{color:#7fd6a8}
+.fxitem{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.fxitem .info{flex:1;min-width:0}
+.fxitem b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fxitem small{display:block;color:var(--mute);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fxitem .acts{display:flex;gap:4px;flex:none}
+.fxitem .acts button{height:30px;padding:0 8px}
+.fxitem .acts .icon{width:30px;padding:0}
+.fxempty{color:var(--mute);font-size:12px;padding:8px 0}
+.saverow{display:flex;gap:8px}
+.saverow input{flex:1;min-width:0;height:30px;background:#101114;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:0 8px;font:inherit}
+.fxbtns{display:flex;gap:8px;margin-top:10px}
+.fxbtns button{flex:1;justify-content:center}
+#menu .manage{color:var(--fx);justify-content:center;border-top:1px solid var(--line)!important;border-radius:0;margin-top:4px}
+.toast.okt{background:#14261b;color:#9be6b9;border-color:#245a36}
 #exp .btns button,#expRec{flex:1;height:38px;justify-content:center}
 .primary{background:var(--acc)!important;color:#1a1205!important;border-color:transparent!important;font-weight:600}
 #expRec{width:100%;margin-top:8px}
@@ -116,7 +137,8 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
   #params.collapsed .pb,#params.collapsed .empty{display:none}
   #params.collapsed .mob svg{transform:rotate(180deg)}
   .mob{display:inline-flex!important}
-  .brand span,.hint,#exportBtn span{display:none}
+  .brand span,.hint,#exportBtn span,#fxBtn span{display:none}
+  #fxBtn{padding:0;width:34px;justify-content:center}
   #exportBtn{padding:0;width:34px;justify-content:center}
 }
 </style>
@@ -128,6 +150,7 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
   <span id="time" title="Toca para volver a 0">0.00 s</span>
   <select id="res" title="Tamaño del lienzo"></select>
   <span class="spacer"></span>
+  <button id="fxBtn" title="Mis efectos: importar y administrar"></button>
   <button id="exportBtn" title="Exportar foto o video"></button>
   <button id="reset" title="Restaurar el grafo de ejemplo"></button>
 </header>
@@ -164,6 +187,20 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
     <div id="expPrev"></div>
   </div>
 </div></div>
+<div id="fxDlg" hidden><div class="sheet">
+  <div class="ph"><span class="t">Mis efectos</span><button class="icon" id="fxClose" title="Cerrar"></button></div>
+  <div class="pb">
+    <div class="sec">Importar</div>
+    <div class="note">Archivos <code>.glsl</code>, <code>.txt</code> o <code>.json</code> con código del nodo Código. Se guardan solo en este navegador y aparecen en <b>+ Nodo → Mis efectos</b>.</div>
+    <div class="btns"><span class="filepick"><button tabindex="-1">Elegir archivos…</button><input type="file" id="fxFile" multiple accept=".json,.glsl,.frag,.txt,application/json,text/plain" title="Elegir archivos"></span></div>
+    <textarea class="code" id="fxPaste" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="…o pega aquí el código de un efecto (por ejemplo, el que te dio un LLM)"></textarea>
+    <button id="fxPasteBtn" class="primary">Importar código pegado</button>
+    <div id="fxMsg"></div>
+    <div class="sec">Instalados (<span id="fxCount">0</span>)</div>
+    <div id="fxList"></div>
+    <div class="fxbtns"><button id="fxExportAll">Exportar todos</button></div>
+  </div>
+</div></div>
 <script>
 (()=>{
 'use strict';
@@ -177,13 +214,16 @@ const ICON={
  fit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
  dl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+ puzzle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4h3a2 2 0 1 1 4 0h3v5a2 2 0 1 1 0 4v6h-5a2 2 0 1 0-4 0H5v-5a2 2 0 1 0 0-4V4z"/></svg>',
+ copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>',
+ edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>',
  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>',
  reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>'
 };
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const CH=['Luminancia','R','G','B','Alfa'];
-const CATS={src:'Fuentes',flt:'Filtros',attr:'Atributos',mix:'Combinar',code:'Código'};
+const CATS={src:'Fuentes',flt:'Filtros',attr:'Atributos',mix:'Combinar',code:'Código',fx:'Mis efectos'};
 
 /* ---------------- WebGL ---------------- */
 const canvas=$('#gl');
@@ -422,8 +462,8 @@ const DEFS={
    inputs:[{k:'fg',label:'Frente'},{k:'bg',label:'Fondo'},{k:'mask',label:'Máscara',kind:'scalar',white:true}],params:[
    {k:'mode',t:'enum',label:'Modo',opts:['Sobre','Suma','Multiplicar','Pantalla','Diferencia','Superponer'],v:0},
    {k:'opacity',t:'float',label:'Opacidad',v:1,min:0,max:1}]},
- snippet:{name:'Código',cat:'code',desc:'GLSL por píxel',inputs:[{k:'A',label:'A'},{k:'B',label:'B'},{k:'C',label:'C'}],
-   params:[{k:'code',t:'code',v:DEFAULT_CODE}],td:n=>/@time/.test(n.p.code||''),run:runSnippet}
+ snippet:{name:'Código',cat:'code',desc:'GLSL por píxel',inputs:[{k:'A',label:'A',slot:0},{k:'B',label:'B',slot:1},{k:'C',label:'C',slot:2}],
+   params:[{k:'code',t:'code',v:DEFAULT_CODE}],td:n=>/@time/.test(codeOf(n)),run:runSnippet}
 };
 
 /* ---------------- Grafo ---------------- */
@@ -453,8 +493,10 @@ function evalNode(n,stack=new Set()){
   (d.run||runGeneric)(n,ins,d);
   n._valid=true;n._t=T;return n._out.tex;
 }
-function bindInputs(P,n,ins,d){['A','B','C'].forEach((L,i)=>{const inp=d.inputs[i];const tex=ins[i]||(inp&&inp.white?WHITE:BLACK);
-  bindTex(P,'i'+L,i,tex);set1i(P,'uCh'+L,inp?(n.ch[inp.k]||0):0);set1f(P,'uHas'+L,ins[i]?1:0);});}
+function bindInputs(P,n,ins,d){
+  const slots=[null,null,null];d.inputs.forEach((inp,i)=>{slots[inp.slot!==undefined?inp.slot:i]={inp,tex:ins[i]};});
+  ['A','B','C'].forEach((L,s)=>{const o=slots[s],inp=o&&o.inp,tex=(o&&o.tex)||(inp&&inp.white?WHITE:BLACK);
+    bindTex(P,'i'+L,s,tex);set1i(P,'uCh'+L,inp?(n.ch[inp.k]||0):0);set1f(P,'uHas'+L,o&&o.tex?1:0);});}
 function hex3(h){const v=parseInt(String(h).slice(1),16)||0;return[(v>>16&255)/255,(v>>8&255)/255,(v&255)/255];}
 function setParams(P,list,vals,pre=''){for(const q of list){const v=vals[pre+q.k],u='u_'+q.k;
   if(q.t==='float')set1f(P,u,+v||0);else if(q.t==='int'||q.t==='enum')set1i(P,u,Math.round(+v||0));
@@ -505,16 +547,19 @@ function buildSnippet(code){
   for(const ln of code.split('\n')){let m;
     if((m=ln.match(/^\s*#param\s+(\w+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/))){params.push({k:m[1],label:m[1],t:'float',v:+m[2],min:+m[3],max:+m[4]});body.push('');}
     else if((m=ln.match(/^\s*#color\s+(\w+)\s+(#[0-9a-fA-F]{6})/))){params.push({k:m[1],label:m[1],t:'color',v:m[2]});body.push('');}
+    else if(/^\s*#(effect|desc|input)\b/.test(ln))body.push('');
     else body.push(ln);}
-  const MAP={A:'_A',B:'_B',C:'_C',uv:'vUv',P:'gl_FragCoord.xy',res:'uRes',time:'uTime',out:'_out'};
+  const MAP={A:'_A',B:'_B',C:'_C',Av:'pick(_A,uChA)',Bv:'pick(_B,uChB)',Cv:'pick(_C,uChC)',uv:'vUv',P:'gl_FragCoord.xy',res:'uRes',time:'uTime',out:'_out'};
   const src=body.join('\n').replace(/@(\w+)/g,(s,k)=>MAP[k]||('u_'+k));
   const decl=params.map(p=>`uniform ${p.t==='color'?'vec3':'float'} u_${p.k};`).join('\n');
   const fs=FS_HEAD+decl+'\nvoid main(){\nvec4 _A=texture(iA,vUv),_B=texture(iB,vUv),_C=texture(iC,vUv);\nvec4 _out=_A;\n#line 1\n'+src+'\noutColor=_out;\n}';
   return{params,fs};
 }
+function codeOf(n){if(n.type==='snippet')return n.p.code||'';const d=DEFS[n.type],e=d&&d.fx&&fxGet(d.fx);return e?e.code:'';}
+const isCodeNode=n=>n.type==='snippet'||!!(DEFS[n.type]&&DEFS[n.type].fx);
 function ensureSnippet(n){
-  if(n._code===n.p.code)return;n._code=n.p.code;
-  const b=buildSnippet(n.p.code||'');n._params=b.params;n._pdef=n._pdef||{};
+  const code=codeOf(n);if(n._code===code)return;n._code=code;
+  const b=buildSnippet(code);n._params=b.params;n._pdef=n._pdef||{};
   for(const q of b.params){const key='$'+q.k;if(n.p[key]===undefined||n._pdef[q.k]!==undefined&&n._pdef[q.k]!==q.v)n.p[key]=q.v;n._pdef[q.k]=q.v;}
   const r=compile(b.fs);n._err=r.err||null;if(r.p)n._prog=r;
 }
@@ -522,6 +567,121 @@ function runSnippet(n,ins,d){
   ensureSnippet(n);
   if(!n._prog){pass(FS.pass,n._out,P=>bindInputs(P,n,ins,d));return;}
   pass(n._prog,n._out,P=>{bindInputs(P,n,ins,d);setParams(P,n._params,n.p,'$');});
+}
+
+
+/* ---------------- Mis efectos: biblioteca guardada en el navegador ---------------- */
+const FXKEY='agnes-effects-v1';let FX=[];
+const fxGet=id=>FX.find(e=>e.id===id);
+function parseMeta(code){
+  const g=re=>{const m=code.match(re);return m?m[1].trim():'';};
+  const inputs=[];const re=/^[ \t]*#input[ \t]+([ABC])\b[ \t]*(.*)$/gm;let m;
+  while((m=re.exec(code))){let label=m[2].trim(),scalar=false;
+    if(/\s*\bscalar$/i.test(label)){scalar=true;label=label.replace(/\s*\bscalar$/i,'').trim();}
+    if(!inputs.some(i=>i.k===m[1]))inputs.push({k:m[1],label:label||m[1],scalar});}
+  return{name:g(/^[ \t]*#effect[ \t]+(.+)$/m),desc:g(/^[ \t]*#desc[ \t]+(.+)$/m),inputs};
+}
+function fxInputs(code){
+  const meta=parseMeta(code);let ins=meta.inputs;
+  if(!ins.length)ins=['A','B','C'].filter(L=>new RegExp('@'+L+'v?\\b|\\b'+L+'\\s*\\(').test(code)).map(L=>({k:L,label:L,scalar:false}));
+  return ins.sort((a,b)=>a.k<b.k?-1:1).map(i=>({k:i.k,label:i.label,slot:'ABC'.indexOf(i.k),kind:i.scalar?'scalar':'rgba',white:i.scalar}));
+}
+function registerFX(e){
+  DEFS['fx:'+e.id]={name:e.name,cat:'fx',desc:e.desc||'',fx:e.id,inputs:fxInputs(e.code),params:[],
+    td:n=>/@time/.test(codeOf(n)),run:runSnippet};
+}
+function saveFX(){try{localStorage.setItem(FXKEY,JSON.stringify(FX));return true;}catch(_){toast('No se pudo guardar en el navegador (almacenamiento lleno o bloqueado)');return false;}}
+function loadFX(){try{const a=JSON.parse(localStorage.getItem(FXKEY)||'[]');FX=Array.isArray(a)?a.filter(e=>e&&typeof e.id==='string'&&typeof e.code==='string'&&e.name):[];}catch(_){FX=[];}
+  FX.forEach(registerFX);}
+function fxRefreshNodes(id){const t='fx:'+id,d=DEFS[t];
+  nodes.forEach(n=>{if(n.type!==t)return;n._code=null;
+    for(const k in n.inputs)if(!d.inputs.some(i=>i.k===k))delete n.inputs[k];invalidate(n);});}
+/* Crea o actualiza (por nombre, sin distinguir mayúsculas). Devuelve {e, updated} */
+function upsertFX(name,desc,code){
+  name=String(name).trim().slice(0,60)||'Efecto sin nombre';desc=String(desc||'').trim().slice(0,140);
+  let e=FX.find(x=>x.name.toLowerCase()===name.toLowerCase()),updated=!!e;
+  if(e){e.name=name;e.desc=desc||e.desc;e.code=code;e.updated=Date.now();}
+  else{e={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,desc,code,created:Date.now()};FX.push(e);}
+  registerFX(e);if(updated)fxRefreshNodes(e.id);return{e,updated};
+}
+function deleteFX(id){const e=fxGet(id);if(!e)return;const t='fx:'+id;
+  /* los nodos que lo usan se convierten en nodos Código con el mismo código, para no romper el grafo */
+  nodes.forEach(n=>{if(n.type!==t)return;n.type='snippet';n.p.code=e.code;n._code=null;invalidate(n);});
+  FX=FX.filter(x=>x!==e);delete DEFS[t];saveFX();buildMenu();renderGraph();renderParams();scheduleSave();renderFxList();}
+function stripFences(c){const m=String(c).match(/```[\w-]*[ \t]*\r?\n([\s\S]*?)```/);return(m?m[1]:String(c)).replace(/\r\n?/g,'\n').replace(/^﻿/,'');}
+function parseImport(text,filename){
+  const t=String(text).replace(/^﻿/,'').trim();let raw=[];
+  if(t[0]==='{'||t[0]==='['){let j;try{j=JSON.parse(t);}catch(err){throw new Error('JSON inválido: '+err.message);}
+    const arr=Array.isArray(j)?j:Array.isArray(j.effects)?j.effects:[j];
+    arr.forEach((o,i)=>{if(!o||typeof o.code!=='string')throw new Error(`El efecto ${i+1} no tiene el campo "code"`);raw.push(o);});}
+  else raw.push({code:t});
+  const base=(filename||'').replace(/\.[^.]+$/,'').replace(/[-_]+/g,' ').trim();
+  return raw.map(o=>{const code=stripFences(o.code).trim()+'\n';const m=parseMeta(code);
+    return{name:o.name||m.name||(raw.length===1?base:'')||'Efecto sin nombre',desc:o.desc||m.desc||'',code};});
+}
+function importText(text,filename){
+  const out={ok:[],upd:[],bad:[]};let items;
+  try{items=parseImport(text,filename);}catch(err){out.bad.push(`${filename||'Texto pegado'}: ${err.message}`);return out;}
+  for(const it of items){
+    if(it.code.length>65536){out.bad.push(`${it.name}: el código es demasiado largo (máx. 64 KB)`);continue;}
+    const r=compile(buildSnippet(it.code).fs);
+    if(r.err){out.bad.push(`${it.name}: ${fmtErr(r.err)}`);continue;}
+    const{e,updated}=upsertFX(it.name,it.desc,it.code);(updated?out.upd:out.ok).push(e.name);}
+  return out;
+}
+function reportImport(results){
+  const ok=results.flatMap(r=>r.ok),upd=results.flatMap(r=>r.upd||[]),bad=results.flatMap(r=>r.bad);
+  if(ok.length||upd.length){saveFX();buildMenu();renderGraph();renderParams();scheduleSave();}
+  renderFxList();
+  const m=$('#fxMsg');m.innerHTML=(ok.length?`<div class="good">✓ ${ok.length===1?'Importado':'Importados'}: ${ok.map(esc).join(', ')}</div>`:'')+
+    (upd.length?`<div class="good">↻ ${upd.length===1?'Actualizado':'Actualizados'}: ${upd.map(esc).join(', ')}</div>`:'')+
+    (bad.length?`<div class="bad">No se importó:\n${bad.map(esc).join('\n')}</div>`:'');
+}
+function fxToJSON(list){const one=e=>({name:e.name,desc:e.desc||'',code:e.code});
+  return JSON.stringify(list.length===1?Object.assign({agnes:'effect',version:1},one(list[0])):{agnes:'effects',version:1,effects:list.map(one)},null,2);}
+function slug(t){return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'efecto';}
+async function saveTextFile(text,name){
+  const blob=new Blob([text],{type:'application/json'});
+  if(dl){try{await dl.save({filename:name,data:blob});return 'Guardado: '+name;}catch(err){if(err&&err.code==='declined')return 'Guardado cancelado.';}}
+  if(!window.claude){try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();return 'Descargado: '+name;}catch(_){}}
+  try{await navigator.clipboard.writeText(text);return 'No se pudo descargar aquí; lo copié al portapapeles.';}catch(_){return 'No se pudo descargar ni copiar en esta vista.';}
+}
+function renderFxList(){
+  $('#fxCount').textContent=FX.length;
+  $('#fxList').innerHTML=FX.length?FX.map(e=>{const ins=fxInputs(e.code).map(i=>i.k).join(' ')||'sin entradas';
+    return `<div class="fxitem" data-id="${e.id}"><div class="info"><b>${esc(e.name)}</b><small>${esc(e.desc||'')}${e.desc?' · ':''}entradas: ${ins}</small></div><div class="acts">
+      <button data-fx="add" title="Agregar al grafo">${ICON.plus}</button><button class="icon" data-fx="edit" title="Abrir el código en un nodo Código">${ICON.edit}</button>
+      <button class="icon" data-fx="copy" title="Copiar código">${ICON.copy}</button><button class="icon" data-fx="dl" title="Exportar .json">${ICON.dl}</button>
+      <button class="icon" data-fx="del" title="Eliminar">${ICON.trash}</button></div></div>`;}).join(''):'<div class="fxempty">Todavía no hay efectos. Importa un archivo, pega código, o guarda uno desde un nodo Código.</div>';
+}
+function openFx(){closeMenu();$('#fxMsg').innerHTML='';renderFxList();$('#fxDlg').hidden=false;}
+function initFx(){
+  $('#fxBtn').innerHTML=ICON.puzzle+'<span>Efectos</span>';$('#fxClose').innerHTML=ICON.close;
+  $('#fxBtn').onclick=openFx;$('#fxClose').onclick=()=>{$('#fxDlg').hidden=true;};
+  $('#fxDlg').addEventListener('click',async e=>{
+    if(e.target.id==='fxDlg'){$('#fxDlg').hidden=true;return;}
+    const b=e.target.closest('button[data-fx]');if(!b)return;const id=b.closest('.fxitem').dataset.id,fx=fxGet(id);if(!fx)return;const a=b.dataset.fx;
+    if(a==='add'){$('#fxDlg').hidden=true;addNode('fx:'+id);}
+    else if(a==='edit'){$('#fxDlg').hidden=true;const prev=selId;selId=null;addNode('snippet');const n=byId(selId);n.p.code=fx.code;n._code=null;
+      if(prev&&byId(prev))n.inputs.A=prev;invalidate(n);renderGraph();renderParams();scheduleSave();toast('Edita el código y usa «Guardar en mis efectos» con el mismo nombre',true);}
+    else if(a==='copy'){try{await navigator.clipboard.writeText(fx.code);$('#fxMsg').innerHTML='<div class="good">✓ Código copiado</div>';}
+      catch(_){$('#fxPaste').value=fx.code;$('#fxMsg').innerHTML='<div class="bad">No se pudo copiar aquí; dejé el código en el cuadro de texto.</div>';}}
+    else if(a==='dl'){$('#fxMsg').textContent=await saveTextFile(fxToJSON([fx]),slug(fx.name)+'.agnes.json');}
+    else if(a==='del'){if(b.dataset.arm){deleteFX(id);$('#fxMsg').innerHTML=`<div class="good">Eliminado: ${esc(fx.name)}</div>`;}
+      else{b.dataset.arm='1';b.style.color='#ff9ea8';b.title='Toca otra vez para eliminar';setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.style.color='';}},2500);}}
+  });
+  $('#fxFile').addEventListener('change',async e=>{const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
+    const res=[];for(const f of files){if(f.size>262144){res.push({ok:[],upd:[],bad:[`${f.name}: archivo demasiado grande`]});continue;}
+      try{res.push(importText(await f.text(),f.name));}catch(err){res.push({ok:[],upd:[],bad:[`${f.name}: no se pudo leer`]});}}
+    reportImport(res);});
+  $('#fxPasteBtn').onclick=()=>{const t=$('#fxPaste').value;if(!t.trim()){$('#fxMsg').innerHTML='<div class="bad">Pega primero el código de un efecto.</div>';return;}
+    const r=importText(t,'');reportImport([r]);if(r.ok.length)$('#fxPaste').value='';};
+  $('#fxExportAll').onclick=async()=>{if(!FX.length){$('#fxMsg').innerHTML='<div class="bad">No hay efectos para exportar.</div>';return;}
+    $('#fxMsg').textContent=await saveTextFile(fxToJSON(FX),'agnes-efectos.json');};
+  /* soltar archivos .glsl/.json sobre el diálogo */
+  $('#fxDlg').addEventListener('dragover',e=>e.preventDefault());
+  $('#fxDlg').addEventListener('drop',async e=>{e.preventDefault();const files=[...(e.dataTransfer.files||[])];const res=[];
+    for(const f of files)res.push(importText(await f.text(),f.name));if(res.length)reportImport(res);});
 }
 
 /* ---------------- Visor ---------------- */
@@ -540,6 +700,7 @@ function subtitle(n){
   if(n.type==='video')return n._fileName||'Sin archivo';
   if(n.type==='noise')return n.p.speed>0?'fbm animado':'fbm';
   if(n.type==='ramp')return DEFS.ramp.params[0].opts[n.p.mode|0];
+  if(DEFS[n.type]&&DEFS[n.type].fx)return DEFS[n.type].desc||'Efecto';
   return '';
 }
 function nodeHTML(n){const d=DEFS[n.type];
@@ -570,7 +731,8 @@ function fitView(){
   const pad=26,bottom=48;const s=clamp(Math.min((r.width-pad*2)/(x1-x0),(r.height-pad-bottom)/(y1-y0)),.3,1.1);
   view.s=s;view.x=(r.width-(x1-x0)*s)/2-x0*s;view.y=pad*.6+((r.height-pad-bottom)-(y1-y0)*s)/2-y0*s;applyView();}
 let toastT;
-function toast(msg){let t=graphEl.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';graphEl.appendChild(t);}
+function toast(msg,ok){let t=graphEl.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';graphEl.appendChild(t);}
+  t.classList.toggle('okt',!!ok);
   t.textContent=msg;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2200);}
 function connect(src,dst,k){if(!src||!dst||src===dst)return;if(dependsOn(src,dst)){toast('Esa conexión crearía un ciclo');return;}
   const n=byId(dst);n.inputs[k]=src;invalidate(n);}
@@ -649,10 +811,12 @@ graphEl.addEventListener('click',e=>{const eye=e.target.closest('.node .eye');if
 
 /* Menú de nodos */
 function buildMenu(){let h='';for(const c in CATS){const items=Object.entries(DEFS).filter(([,d])=>d.cat===c);if(!items.length)continue;
-  h+=`<h6>${CATS[c]}</h6>`+items.map(([k,d])=>`<button data-type="${k}"><span class="cat" style="--c:var(--${d.cat})"></span>${esc(d.name)}<small>${esc(d.desc||'')}</small></button>`).join('');}
+  h+=`<h6>${CATS[c]}</h6>`+items.map(([k,d])=>`<button data-type="${esc(k)}"><span class="cat" style="--c:var(--${d.cat})"></span>${esc(d.name)}<small>${esc(d.desc||'')}</small></button>`).join('');}
+  if(!FX.length)h+=`<h6>${CATS.fx}</h6>`;
+  h+=`<button class="manage" data-manage>${ICON.puzzle}Importar o administrar efectos…</button>`;
   menuEl.innerHTML=h;}
 function closeMenu(){menuEl.hidden=true;}
-menuEl.addEventListener('click',e=>{const b=e.target.closest('button[data-type]');if(b)addNode(b.dataset.type);});
+menuEl.addEventListener('click',e=>{if(e.target.closest('[data-manage]')){openFx();return;}const b=e.target.closest('button[data-type]');if(b)addNode(b.dataset.type);});
 $('#add').innerHTML=ICON.plus+'Nodo';$('#add').onclick=e=>{e.stopPropagation();menuEl.hidden=!menuEl.hidden;};
 $('#fit').innerHTML=ICON.fit;$('#fit').classList.add('icon');$('#fit').style.width='36px';$('#fit').onclick=fitView;
 document.addEventListener('pointerdown',e=>{if(!menuEl.hidden&&!e.target.closest('#menu,#add'))closeMenu();});
@@ -669,7 +833,7 @@ function fileHTML(n,q){return `<div class="row wide"><label>${esc(q.label)}</lab
 function renderParams(){
   const n=byId(selId);
   if(!n){paramsEl.innerHTML=`<div class="ph"><span class="t">Parámetros</span><button class="icon mob" data-act="col">${ICON.chev}</button></div><div class="empty">Toca un nodo para editarlo. El <b style="color:var(--blue)">ojo</b> lo muestra en el visor.<br>Arrastra desde la salida <span class="dotw"></span> de un nodo a la entrada de otro para pasarle su capa. Las entradas <span class="sq"></span> ámbar reciben un <b>atributo</b>: eliges un canal de esa capa y controla un parámetro (máscara, tamaño de desenfoque, desplazamiento…).</div>`;return;}
-  const d=DEFS[n.type];if(n.type==='snippet')ensureSnippet(n);
+  const d=DEFS[n.type];if(isCodeNode(n))ensureSnippet(n);
   let h=`<div class="ph"><span class="cat" style="--c:var(--${d.cat})"></span><span class="t">${esc(d.name)}</span><button class="icon" data-act="disp" title="Mostrar en el visor">${ICON.eye}</button><button class="icon" data-act="del" title="Eliminar nodo">${ICON.trash}</button><button class="icon mob" data-act="col">${ICON.chev}</button></div><div class="pb">`;
   if(d.inputs.length){h+=`<div class="sec">Entradas</div>`;
     for(const i of d.inputs){const s=byId(n.inputs[i.k]);
@@ -685,9 +849,13 @@ function renderParams(){
     <li><code>@out</code>: resultado (vec4), empieza igual a <code>@A</code></li>
     <li><code>#param nombre def min max</code>: crea un deslizador, se usa como <code>@nombre</code></li>
     <li><code>#color nombre #rrggbb</code>: crea un selector de color</li>
-    <li>Funciones: <code>luma</code>, <code>noise</code>, <code>fbm(vec3 p, int oct)</code>, <code>rgb2hsv</code>, <code>hsv2rgb</code></li></ul></details>`;}
+    <li>Funciones: <code>luma</code>, <code>noise</code>, <code>fbm(vec3 p, int oct)</code>, <code>rgb2hsv</code>, <code>hsv2rgb</code></li>
+    <li>Encabezado de efecto: <code>#effect Nombre</code>, <code>#desc …</code>, <code>#input A Etiqueta</code></li></ul></details>
+    <div class="sec">Guardar como efecto</div><div class="saverow"><input id="fxName" maxlength="60" placeholder="Nombre del efecto" value="${esc(parseMeta(n.p.code||'').name)}"><button data-act="savefx">Guardar en mis efectos</button></div>`;}
+  if(d.fx){const fx=fxGet(d.fx);h+=`<div id="snipStatus"></div><div id="snipParams"></div><div class="fxbtns"><button data-act="fxedit">${ICON.edit}Editar código</button><button data-act="fxlib">${ICON.puzzle}Mis efectos</button></div>`+
+    (fx&&fx.desc?`<div class="note" style="color:var(--mute);font-size:12px;margin-top:10px">${esc(fx.desc)}</div>`:'');}
   h+='</div>';paramsEl.innerHTML=h;
-  if(n.type==='snippet')renderSnipDyn(n);
+  if(isCodeNode(n))renderSnipDyn(n);
 }
 function fmtErr(e){return e.replace(/ERROR:\s*0:(\d+):/g,'Línea $1:').replace(/\u0000/g,'').trim();}
 function renderSnipDyn(n){
@@ -716,6 +884,12 @@ paramsEl.addEventListener('click',e=>{
   if(!n)return;
   if(b.dataset.act==='disp')setDisplay(n.id);
   else if(b.dataset.act==='del')deleteNode(n.id);
+  else if(b.dataset.act==='savefx'){ensureSnippet(n);if(n._err){toast('Corrige los errores del código antes de guardarlo');return;}
+    const meta=parseMeta(n.p.code||''),name=($('#fxName').value||meta.name||'Mi efecto').trim();
+    const{e:fx,updated}=upsertFX(name,meta.desc,n.p.code);if(saveFX()){buildMenu();renderGraph();scheduleSave();toast((updated?'Actualizado: ':'Guardado en Mis efectos: ')+fx.name,true);}}
+  else if(b.dataset.act==='fxedit'){const fx=fxGet(DEFS[n.type].fx);if(!fx)return;const src=n.inputs;selId=null;addNode('snippet');const m=byId(selId);
+    m.p.code=fx.code;m._code=null;Object.assign(m.inputs,src);invalidate(m);renderGraph();renderParams();scheduleSave();toast('Edita y guarda con el mismo nombre para actualizar el efecto',true);}
+  else if(b.dataset.act==='fxlib')openFx();
 });
 paramsEl.addEventListener('change',e=>{
   const t=e.target;if(t.dataset.fileinput===undefined)return;const n=byId(selId);const f=t.files&&t.files[0];if(!n||!f)return;
@@ -748,8 +922,10 @@ function loadVideo(n,f){
 /* ---------------- Guardado local ---------------- */
 const KEY='agnes-graph-v1',OLD_KEY='nodal-graph-v1';let saveT;
 function scheduleSave(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify({res:resIdx,display:displayId,nextId,view,
-  nodes:nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,p:n.p,inputs:n.inputs,ch:n.ch}))}));}catch(_){}},400);}
+  nodes:nodes.map(n=>{const o={id:n.id,type:n.type,x:n.x,y:n.y,p:n.p,inputs:n.inputs,ch:n.ch};if(DEFS[n.type]&&DEFS[n.type].fx)o.fxcode=codeOf(n);return o;})}));}catch(_){}},400);}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem(OLD_KEY)||'null');if(!s||!Array.isArray(s.nodes)||!s.nodes.length)return false;
+  /* un efecto que ya no está en la biblioteca se convierte en nodo Código con su copia del código */
+  s.nodes.forEach(n=>{if(n&&typeof n.type==='string'&&n.type.startsWith('fx:')&&!DEFS[n.type]){n.type='snippet';n.p=Object.assign({},n.p,{code:n.fxcode||''});}});
   nodes=s.nodes.filter(n=>DEFS[n.type]).map(n=>{const d=DEFS[n.type],p={};d.params.forEach(q=>{if(q.v!==undefined)p[q.k]=q.v;});
     return{id:n.id,type:n.type,x:+n.x||0,y:+n.y||0,p:Object.assign(p,n.p||{}),inputs:n.inputs||{},ch:n.ch||{}};});
   nextId=Math.max(s.nextId|0,...nodes.map(n=>+n.id.slice(1)+1||1));displayId=byId(s.display)?s.display:(nodes[0]||{}).id;
@@ -976,6 +1152,7 @@ function initExport(){
 
 /* ---------------- Inicio ---------------- */
 canvas.width=W;canvas.height=H;
+loadFX();
 const restored=load();if(!restored)demo();
 resSel.innerHTML=RES.map((r,i)=>`<option value="${i}"${i===resIdx?' selected':''}>${r[2]}</option>`).join('');
 resSel.onchange=e=>{setRes(+e.target.value);updateInfo();scheduleSave();};
@@ -983,8 +1160,8 @@ resetLabel();buildMenu();setPlaying(true);renderGraph();renderParams();
 if(window.matchMedia('(max-width:760px)').matches)paramsEl.classList.add('collapsed');
 requestAnimationFrame(()=>{fitView();requestAnimationFrame(loop);});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{uploadTex(DEFAULT_IMG,patternCanvas());nodes.forEach(n=>{if(n.type==='image'&&!n._own)invalidate(n);});renderGraph();});
-initExport();
-window.__agnes={nodes:()=>nodes,DEFS,compile,FS,buildSnippet};
+initExport();initFx();
+window.__agnes={nodes:()=>nodes,FX:()=>FX,importText,parseMeta,DEFS,compile,FS,buildSnippet};
 })();
 </script>
 </body>

@@ -1,0 +1,61 @@
+{
+  "agnes": "effects",
+  "version": 1,
+  "effects": [
+    {
+      "name": "Duotono",
+      "desc": "Sombras y luces con dos colores",
+      "code": "#effect Duotono\n#desc Sombras y luces con dos colores\n#input A Imagen\n\n#color sombra #1a0b3d\n#color luz #ffb36b\n#param contraste 1.2 0 3\n\nfloat l = luma(@A.rgb);\nl = clamp((l - 0.5) * @contraste + 0.5, 0.0, 1.0);\n@out.rgb = mix(@sombra, @luz, l);\n"
+    },
+    {
+      "name": "Grano y viñeta",
+      "desc": "Grano animado de película con viñeta",
+      "code": "#effect Grano y viñeta\n#desc Grano animado de película con viñeta\n#input A Imagen\n\n#param grano 0.08 0 0.5\n#param vig 1.2 0 3\n\nvec2 d = @uv - 0.5;\nd.x *= @res.x / @res.y;\nfloat n = hash13(vec3(@P, floor(@time * 24.0))) - 0.5;\n@out.rgb += n * @grano;\n@out.rgb *= 1.0 - @vig * dot(d, d);\n"
+    },
+    {
+      "name": "Pixelado",
+      "desc": "Bloques cuadrados de tamaño ajustable",
+      "code": "#effect Pixelado\n#desc Bloques cuadrados de tamaño ajustable\n#input A Imagen\n\n#param bloque 12 2 64\n\nvec2 cell = vec2(@bloque) / @res;\nvec2 uv = (floor(@uv / cell) + 0.5) * cell;\n@out = A(uv);\n"
+    },
+    {
+      "name": "Semitono",
+      "desc": "Puntos de imprenta según la luminancia",
+      "code": "#effect Semitono\n#desc Puntos de imprenta según la luminancia\n#input A Imagen\n\n#param celda 10 4 40\n#param angulo 45 0 90\n#color tinta #111111\n#color papel #f4efe4\n\nfloat a = radians(@angulo);\nmat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));\nvec2 p = R * @P;\nvec2 id = floor(p / @celda);\nvec2 f = fract(p / @celda) - 0.5;\nvec2 centro = transpose(R) * ((id + 0.5) * @celda);\nfloat l = luma(A(centro / @res).rgb);\nfloat r = sqrt(1.0 - l) * 0.75;\nfloat punto = 1.0 - smoothstep(r - 0.06, r + 0.06, length(f));\n@out = vec4(mix(@papel, @tinta, punto), 1.0);\n"
+    },
+    {
+      "name": "Pantalla CRT",
+      "desc": "Curvatura de barril y líneas de barrido",
+      "code": "#effect Pantalla CRT\n#desc Curvatura de barril y líneas de barrido\n#input A Imagen\n\n#param curva 0.12 0 0.4\n#param lineas 0.35 0 1\n\nvec2 c = @uv * 2.0 - 1.0;\nc *= 1.0 + @curva * dot(c, c) * 0.5;\nvec2 uv = c * 0.5 + 0.5;\nif (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {\n  @out = vec4(0.0, 0.0, 0.0, 1.0);\n} else {\n  vec4 col = A(uv);\n  float s = 0.5 + 0.5 * sin(uv.y * @res.y * 3.14159);\n  col.rgb *= 1.0 - @lineas * (1.0 - s);\n  @out = col;\n}\n"
+    },
+    {
+      "name": "Ondas",
+      "desc": "Deformación ondulante animada",
+      "code": "#effect Ondas\n#desc Deformación ondulante animada\n#input A Imagen\n\n#param amp 0.01 0 0.05\n#param freq 18 1 80\n#param vel 2 0 10\n\nvec2 uv = @uv;\nuv.x += sin(uv.y * @freq + @time * @vel) * @amp;\nuv.y += cos(uv.x * @freq * 0.7 + @time * @vel) * @amp;\n@out = A(uv);\n"
+    },
+    {
+      "name": "Caleidoscopio",
+      "desc": "Simetría radial de N segmentos",
+      "code": "#effect Caleidoscopio\n#desc Simetría radial de N segmentos\n#input A Imagen\n\n#param segmentos 6 2 16\n#param giro 0 0 6.2832\n\nvec2 p = @uv - 0.5;\np.x *= @res.x / @res.y;\nfloat r = length(p);\nfloat a = atan(p.y, p.x) + @giro;\nfloat seg = 6.28318 / floor(@segmentos);\na = abs(mod(a, seg) - seg * 0.5);\np = vec2(cos(a), sin(a)) * r;\np.x /= @res.x / @res.y;\n@out = A(p + 0.5);\n"
+    },
+    {
+      "name": "Bordes neón",
+      "desc": "Contornos Sobel brillantes sobre la imagen oscurecida",
+      "code": "#effect Bordes neón\n#desc Contornos Sobel brillantes sobre la imagen oscurecida\n#input A Imagen\n\n#color neon #00f0ff\n#param fuerza 3 0 10\n#param fondo 0.25 0 1\n\nvec2 px = 1.0 / @res;\nfloat tl = luma(A(@uv + px * vec2(-1.0,  1.0)).rgb);\nfloat t  = luma(A(@uv + px * vec2( 0.0,  1.0)).rgb);\nfloat tr = luma(A(@uv + px * vec2( 1.0,  1.0)).rgb);\nfloat l  = luma(A(@uv + px * vec2(-1.0,  0.0)).rgb);\nfloat r  = luma(A(@uv + px * vec2( 1.0,  0.0)).rgb);\nfloat bl = luma(A(@uv + px * vec2(-1.0, -1.0)).rgb);\nfloat b  = luma(A(@uv + px * vec2( 0.0, -1.0)).rgb);\nfloat br = luma(A(@uv + px * vec2( 1.0, -1.0)).rgb);\nfloat gx = tr + 2.0 * r + br - tl - 2.0 * l - bl;\nfloat gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;\nfloat e = clamp(length(vec2(gx, gy)) * @fuerza, 0.0, 1.0);\n@out.rgb = @A.rgb * @fondo + @neon * e;\n"
+    },
+    {
+      "name": "Desenfoque radial",
+      "desc": "Zoom borroso hacia un centro ajustable",
+      "code": "#effect Desenfoque radial\n#desc Zoom borroso hacia un centro ajustable\n#input A Imagen\n\n#param fuerza 0.15 0 0.5\n#param cx 0.5 0 1\n#param cy 0.5 0 1\n\nvec2 c = vec2(@cx, @cy);\nvec4 acc = vec4(0.0);\nfor (int i = 0; i < 24; i++) {\n  float k = float(i) / 23.0;\n  acc += A(mix(@uv, c, k * @fuerza));\n}\n@out = acc / 24.0;\n"
+    },
+    {
+      "name": "Mezcla con máscara",
+      "desc": "Funde A y B según un atributo de C",
+      "code": "#effect Mezcla con máscara\n#desc Funde A y B según un atributo de C\n#input A Imagen 1\n#input B Imagen 2\n#input C Máscara scalar\n\n#param suavidad 0.1 0 0.5\n#param umbral 0.5 0 1\n\n// @Cv = canal elegido de C (luminancia por defecto); sin conectar vale 1\nfloat m = smoothstep(@umbral - @suavidad, @umbral + @suavidad, @Cv);\n@out = mix(@A, @B, m);\n"
+    },
+    {
+      "name": "Plasma",
+      "desc": "Generador animado de color, sin entradas",
+      "code": "#effect Plasma\n#desc Generador animado de color, sin entradas\n\n#param escala 3 0.5 12\n#param vel 0.6 0 3\n\nvec2 p = (@uv - 0.5) * vec2(@res.x / @res.y, 1.0) * @escala;\nfloat t = @time * @vel;\nfloat v = sin(p.x + t) + sin(p.y * 1.3 - t) + sin(length(p) * 1.7 + t * 1.4);\nv += fbm(vec3(p * 0.6, t * 0.3), 4) * 2.0;\nvec3 col = hsv2rgb(vec3(fract(v * 0.15 + t * 0.05), 0.75, 0.95));\n@out = vec4(col, 1.0);\n"
+    }
+  ]
+}

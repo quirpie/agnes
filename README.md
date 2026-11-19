@@ -12,6 +12,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 - Las entradas ámbar ■ reciben un atributo: eliges el canal y controla un parámetro.
 - El ojo de cada nodo lo muestra en el visor.
 - **Exportar**: foto (PNG/JPG) o video MP4 renderizado cuadro por cuadro.
+- **Efectos**: importa efectos (archivos `.glsl`/`.json` o código pegado), que se guardan en el navegador y aparecen en **+ Nodo → Mis efectos**. Un nodo Código también se puede guardar como efecto. Hay ejemplos en [`efectos/`](efectos).
 
 ## Nodos
 
@@ -22,6 +23,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 | Atributos | Atributo (canal → máscara) |
 | Combinar | Mezclar |
 | Código | Código (GLSL por píxel) |
+| Mis efectos | Los efectos importados o guardados por el usuario |
 
 ## Crear efectos
 
@@ -49,4 +51,4 @@ Funciones: `luma`, `noise`, `fbm(vec3 p, int oct)`, `rgb2hsv`, `hsv2rgb`.
 - WebGL2 con texturas de 16 bits flotantes cuando el equipo las soporta; evaluación perezosa y caché por nodo.
 - El tramado por difusión de error (Atkinson, Floyd–Steinberg) se calcula en CPU sobre la cuadrícula reducida.
 - La exportación de video usa WebCodecs (`VideoEncoder`) y un empaquetador MP4 propio, para que la duración y los cuadros sean exactos.
-- El grafo se guarda en el `localStorage` del navegador; las fotos y videos cargados no se guardan.
+- El grafo y la biblioteca de efectos se guardan en el `localStorage` del navegador (`agnes-graph-v1` y `agnes-effects-v1`); las fotos y videos cargados no se guardan. Un grafo guarda también una copia del código de cada efecto que usa: si el efecto se borra de la biblioteca, sus nodos pasan a ser nodos Código y siguen funcionando.

@@ -4,10 +4,10 @@
 
 Agnes es un compositor de foto y video por nodos que corre en el navegador con WebGL2 (`index.html`, un solo archivo). Hay dos formas de crear un efecto:
 
-1. **Un snippet para el nodo Código** (recomendado). Es GLSL con atributos `@`, se pega en la app y funciona al instante, sin tocar el código fuente. Secciones 1 a 8.
+1. **Un efecto importable** (recomendado). Es código del nodo Código (GLSL con atributos `@`) con un encabezado de nombre, descripción y entradas. El usuario lo importa en **Efectos** (archivo o texto pegado), queda guardado en su navegador y aparece en **+ Nodo → Mis efectos** como un nodo más. No hay que tocar el código fuente. Secciones 0 a 8.
 2. **Un nodo nativo nuevo en `index.html`**, para efectos de varios pases o con procesamiento en CPU. Sección 9.
 
-Si te piden «un efecto» sin más detalle, entrega un snippet para el nodo Código.
+Si te piden «un efecto» sin más detalle, entrega un efecto importable.
 
 ---
 
@@ -15,11 +15,56 @@ Si te piden «un efecto» sin más detalle, entrega un snippet para el nodo Cód
 
 Cuando entregues un efecto, incluye:
 
-1. **Un solo bloque de código** listo para pegar en el nodo Código, con las líneas `#param` y `#color` al inicio.
-2. **Qué conectar:** qué nodo va a la entrada A (y a B y C si el efecto las usa).
+1. **Un solo bloque de código** que empiece con el encabezado de efecto (sección 0.1), seguido de las líneas `#param` y `#color`, y después el código.
+2. **Qué conectar:** qué nodo va a cada entrada.
 3. **Qué hace cada parámetro**, en una línea por parámetro.
+4. **Cómo instalarlo:** «En Agnes, toca **Efectos**, pega el código y toca **Importar código pegado**. Luego agrégalo desde **+ Nodo → Mis efectos**». Si el usuario prefiere archivo, sugiere guardarlo como `nombre.glsl`.
 
 No envuelvas el código en `void main()` ni declares `uniform`: Agnes lo hace por ti (sección 1.1).
+
+### 0.1 Encabezado de efecto
+
+```glsl
+#effect Nombre visible               // obligatorio en la práctica; máx. 60 caracteres
+#desc Qué hace, en una línea         // opcional; aparece en el menú
+#input A Imagen                      // una línea por entrada que use el efecto
+#input C Máscara scalar              // «scalar» = entrada de atributo (■ ámbar)
+```
+
+- `#input` acepta solo las letras `A`, `B` y `C`; el resto de la línea es la etiqueta del puerto.
+- Si agregas `scalar` al final, la entrada se muestra como atributo: el usuario elige un canal (luminancia, R, G, B o alfa) y **sin conectar vale 1** (blanco). Lee el valor elegido con `@Av`, `@Bv` o `@Cv` (sección 1.2).
+- Si no escribes ningún `#input`, Agnes deduce las entradas de las que el código usa (`@A`, `A(...)`, etc.). Un efecto que no usa ninguna es un **generador** (sin entradas), como un ruido o un plasma.
+- Importar un efecto con el mismo `#effect` que uno instalado lo **actualiza** (sin distinguir mayúsculas), y todos los nodos que lo usan se actualizan con él.
+- El encabezado no estorba en un nodo Código: allí esas líneas se ignoran.
+
+Ejemplo completo:
+
+```glsl
+#effect Duotono
+#desc Sombras y luces con dos colores
+#input A Imagen
+#color sombra #1a0b3d
+#color luz #ffb36b
+#param contraste 1.2 0 3
+
+float l = luma(@A.rgb);
+l = clamp((l - 0.5) * @contraste + 0.5, 0.0, 1.0);
+@out.rgb = mix(@sombra, @luz, l);
+```
+
+### 0.2 Formatos de archivo
+
+| Formato | Contenido |
+|---|---|
+| `.glsl`, `.frag`, `.txt` | Un efecto: el código con su encabezado. Si falta `#effect`, el nombre sale del archivo. |
+| `.json` (uno) | `{"agnes":"effect","version":1,"name":"…","desc":"…","code":"…"}` |
+| `.json` (varios) | `{"agnes":"effects","version":1,"effects":[{"name":"…","desc":"…","code":"…"}, …]}` o directamente un arreglo. |
+
+En JSON, `name` y `desc` son opcionales si el `code` ya trae `#effect` y `#desc`; si vienen, mandan sobre el encabezado. Al pegar texto, Agnes extrae el primer bloque de código entre ```` ``` ````, así que el usuario puede pegar tu respuesta completa.
+
+Agnes compila cada efecto antes de guardarlo: si tiene errores, no lo importa y muestra el mensaje con su número de línea. El código es solo GLSL y corre en la GPU, nunca como JavaScript, así que importar efectos de otras personas no da acceso a nada del navegador.
+
+La carpeta [`efectos/`](../efectos) del repositorio tiene ejemplos listos para importar, incluido `todos.agnes.json` con todos juntos.
 
 ---
 
@@ -29,7 +74,7 @@ No envuelvas el código en `void main()` ni declares `uniform`: Agnes lo hace po
 
 Tu texto se procesa así:
 
-1. Las líneas `#param` y `#color` se quitan (quedan en blanco para que los números de línea coincidan) y se convierten en controles y `uniform`.
+1. Las líneas `#param` y `#color` se quitan (quedan en blanco para que los números de línea coincidan) y se convierten en controles y `uniform`. Las de encabezado (`#effect`, `#desc`, `#input`) también se quitan.
 2. Cada `@nombre` se reemplaza por el identificador GLSL correspondiente (tabla 1.2).
 3. El resultado se inserta dentro de `main()`:
 
@@ -60,6 +105,7 @@ Consecuencias:
 | Atributo | Se convierte en | Tipo | Significado |
 |---|---|---|---|
 | `@A` `@B` `@C` | `_A` `_B` `_C` | `vec4` | Color RGBA de cada entrada en el píxel actual. Una entrada sin conectar vale `vec4(0.0)`. |
+| `@Av` `@Bv` `@Cv` | `pick(_A,uChA)` … | `float` | Valor del canal elegido en el panel para esa entrada (con `#input … scalar`). En entradas normales es la luminancia. |
 | `@out` | `_out` | `vec4` | Resultado del píxel. Empieza igual a `@A`. |
 | `@uv` | `vUv` | `vec2` | Coordenada normalizada 0–1. **(0,0) es la esquina inferior izquierda.** |
 | `@P` | `gl_FragCoord.xy` | `vec2` | Coordenada en píxeles (centro del píxel: 0.5, 1.5, …). |
@@ -275,7 +321,7 @@ p.x /= @res.x / @res.y;
 ```
 
 ### 5.8 Mezcla con máscara (usa A, B y C)
-Conecta dos imágenes a A y B, y una máscara (por ejemplo un Ruido o un Degradado) a C. Si C no está conectada, `uHasC` vale 0 y se muestra A.
+Conecta dos imágenes a A y B, y una máscara (por ejemplo un Ruido o un Degradado) a C. Si C no está conectada, `uHasC` vale 0 y se muestra A. La versión importable en `efectos/mezcla-mascara.glsl` declara C como `scalar` y usa `@Cv`.
 ```glsl
 // Mezcla A y B usando la luminancia de C como máscara
 #param suavidad 0.1 0 0.5
@@ -380,7 +426,8 @@ Cuando el código no compila, Agnes muestra el error debajo del editor y el viso
 - [ ] `@out.a` tiene sentido (normalmente `@A.a` o `1.0`).
 - [ ] Menos de ~32 lecturas de textura por píxel.
 - [ ] Solo mencionas `@time` si el efecto se anima.
-- [ ] Indicaste qué conectar a A, B y C.
+- [ ] El código empieza con `#effect` y `#desc`, y tiene un `#input` por cada entrada que usa (con `scalar` si es una máscara o atributo).
+- [ ] Indicaste qué conectar a cada entrada y cómo importarlo.
 
 ---
 
