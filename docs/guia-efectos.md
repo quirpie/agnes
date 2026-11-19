@@ -4,8 +4,8 @@
 
 Agnes es un compositor de foto y video por nodos que corre en el navegador con WebGL2 (`index.html`, un solo archivo). Hay dos formas de crear un efecto:
 
-1. **Un efecto importable** (recomendado). Es código del nodo Código (GLSL con atributos `@`) con un encabezado de nombre, descripción y entradas. El usuario lo importa en **Efectos** (archivo o texto pegado), queda guardado en su navegador y aparece en **+ Nodo → Mis efectos** como un nodo más. No hay que tocar el código fuente. Secciones 0 a 8.
-2. **Un nodo nativo nuevo en `index.html`**, para efectos de varios pases o con procesamiento en CPU. Sección 9.
+1. **Un efecto importable** (recomendado). Es código del nodo Código (GLSL con atributos `@`) con un encabezado de nombre, descripción y entradas. El usuario lo importa en **Efectos** (archivo o texto pegado), queda guardado en su navegador y aparece en **+ Nodo → Mis efectos** como un nodo más. No hay que tocar el código fuente. Secciones 0 a 9.
+2. **Un nodo nativo nuevo en `index.html`**, para efectos de varios pases o con procesamiento en CPU. Sección 10.
 
 Si te piden «un efecto» sin más detalle, entrega un efecto importable.
 
@@ -230,7 +230,7 @@ vec3 col = src.rgb;
 
 ## 4. Límites y rendimiento
 
-- **Un solo pase.** Cada píxel se calcula de forma independiente y solo puede leer las entradas A, B y C, no el resultado de otros píxeles de este mismo nodo. Para efectos de varios pases (por ejemplo, desenfoque separable o bloom), **encadena varios nodos Código** o escribe un nodo nativo (sección 9).
+- **Un solo pase.** Cada píxel se calcula de forma independiente y solo puede leer las entradas A, B y C, no el resultado de otros píxeles de este mismo nodo. Para efectos de varios pases (por ejemplo, desenfoque separable o bloom), **encadena varios nodos Código** o escribe un nodo nativo (sección 10).
 - **Sin memoria entre cuadros.** No hay acceso al cuadro anterior; la animación sale solo de `@time`.
 - **Máximo 3 entradas** (A, B, C).
 - **Rendimiento:** el código corre una vez por píxel en cada cuadro (unos 500 000 píxeles a 960×540, casi 1 millón a 1280×720). En un teléfono de gama media, procura no pasar de unas **32 lecturas de textura** por píxel. Los bucles de 64 o más lecturas se notan.
@@ -403,13 +403,71 @@ for (int i = 0; i < 24; i++) {
 
 ---
 
-## 6. Combinar con otros nodos
+## 6. Efectos que reaccionan al sonido
+
+El nodo **Audio** (Fuentes) carga un archivo de audio, o el audio de un video, y lo analiza en cada cuadro. Hay dos formas de usarlo.
+
+### 6.1 Desde código: el audio como capa
+
+Conecta el nodo Audio a una entrada del efecto. Con la capa en modo **Valores** (por defecto), todos los píxeles valen lo mismo:
+
+| Canal | Valor (0–1) |
+|---|---|
+| `r` | Volumen general |
+| `g` | Graves (20–250 Hz) |
+| `b` | Agudos (2–12 kHz) |
+| `a` | Siempre 1 |
+
+Como la capa es uniforme, basta leer el píxel actual: `@B.g` son los graves. Declara la entrada con `#input B Audio` para que el puerto tenga nombre. Los **medios** (250–2000 Hz) no están en la capa: para usarlos, conecta el parámetro con el control por audio (6.2).
+
+```glsl
+#effect Pulso
+#desc Zoom y brillo que laten con los graves del audio
+#input A Imagen
+#input B Audio
+#param zoom 0.08 0 0.3
+#param brillo 0.6 0 2
+#color destello #ffd9a0
+
+float graves = @B.g;
+vec2 c = @uv - 0.5;
+vec4 col = A(0.5 + c / (1.0 + @zoom * graves));
+col.rgb += @destello * @brillo * graves * graves;
+@out = vec4(col.rgb, col.a);
+```
+
+Consejos:
+
+- Elevar al cuadrado (`graves * graves`) acentúa los golpes y aplana el ruido de fondo.
+- El nodo Audio tiene **Ganancia** (sube todo), **Umbral** (lo que queda por debajo vale 0) y **Suavizado** (respuesta más lenta y menos nerviosa). Dile al usuario cuál ajustar si el efecto se mueve poco o demasiado.
+- Las otras capas del nodo Audio son **Espectro** (barras: x = frecuencia en escala logarítmica, de 30 Hz a 16 kHz) y **Onda** (forma de onda): en una entrada de código, `B(vec2(x, 0.5))` lee la columna `x`, pero ten en cuenta que esas capas dibujan barras o una línea, no un valor por columna en todos los píxeles.
+
+### 6.2 Sin código: control por audio de cualquier parámetro
+
+Junto a cada deslizador de número hay un botón ♪. Al activarlo, el parámetro queda así:
+
+```
+valor = valor del deslizador + cantidad × señal
+```
+
+donde la señal es el volumen, los graves, los medios o los agudos (0–1) del nodo Audio elegido. El resultado se limita al rango del parámetro, y la cantidad puede ser negativa. Funciona con los parámetros de los nodos nativos, de los nodos Código y de los efectos importados (los `#param`). Un cable punteado verde une el nodo Audio con cada nodo que controla.
+
+Si un efecto expone un `#param` con un rango razonable, el usuario puede animarlo con audio sin cambiar tu código. Por eso conviene que los parámetros principales sean `#param` y no constantes.
+
+### 6.3 Sincronía y exportación
+
+El análisis se calcula a partir del audio decodificado y del tiempo, no en vivo: el video exportado queda sincronizado cuadro por cuadro y lleva el audio del nodo Audio (AAC u Opus, según el navegador). En la vista previa, el análisis sigue lo que se está escuchando.
+
+---
+
+## 7. Combinar con otros nodos
 
 A veces es mejor armar un grafo que escribir código. Estos son los nodos nativos:
 
 | Nodo | Entradas (■ = atributo escalar) | Qué hace |
 |---|---|---|
 | Imagen | — | Carga una foto. |
+| Audio | — | Analiza un audio: capa con volumen, graves y agudos; espectro u onda. |
 | Video | — | Carga un video (sin audio). |
 | Ruido | — | Ruido fractal, gris, color o vector; animable. |
 | Degradado | — | Lineal o radial entre dos colores. |
@@ -427,7 +485,7 @@ Una entrada ■ toma **un canal** (luminancia, R, G, B o alfa, a elegir en el pa
 
 ---
 
-## 7. Errores comunes
+## 8. Errores comunes
 
 Los mensajes son los que da Chrome (con ANGLE); otros navegadores los redactan distinto. «Línea N» se refiere a tu snippet.
 
@@ -446,7 +504,7 @@ Cuando el código no compila, Agnes muestra el error debajo del editor y el viso
 
 ---
 
-## 8. Lista de verificación antes de entregar
+## 9. Lista de verificación antes de entregar
 
 - [ ] Todos los literales que deben ser float tienen punto decimal (`1.0`, `0.5`).
 - [ ] Si una función llama a otra, la llamada está definida antes. Ninguna función se llama como las de la cabecera.
@@ -461,11 +519,11 @@ Cuando el código no compila, Agnes muestra el error debajo del editor y el viso
 
 ---
 
-## 9. Avanzado: agregar un nodo nativo a `index.html`
+## 10. Avanzado: agregar un nodo nativo a `index.html`
 
 Usa esta vía solo si el efecto necesita varios pases, texturas intermedias, procesamiento en CPU o una interfaz propia. Todo está en `index.html`.
 
-### 9.1 Definición en `DEFS`
+### 10.1 Definición en `DEFS`
 
 ```js
 miEfecto:{
@@ -483,8 +541,8 @@ miEfecto:{
     {k:'invert',t:'bool',label:'Invertir',v:false},
     {k:'tint',t:'color',label:'Tinte',v:'#ffffff'}
   ],
-  fs:FS.miEfecto,              // shader de un pase (sección 9.2), o bien:
-  // run:runMiEfecto,          // función propia para varios pases (sección 9.3)
+  fs:FS.miEfecto,              // shader de un pase (sección 10.2), o bien:
+  // run:runMiEfecto,          // función propia para varios pases (sección 10.3)
   // td:n=>n.p.speed>0,        // true si depende del tiempo aunque sus entradas no
 },
 ```
@@ -500,7 +558,7 @@ Tipos de parámetro y su uniform automático (`u_` + clave):
 | `color` | selector | `vec3` |
 | `file` | botón de archivo | — (lo maneja `run`) |
 
-### 9.2 Shader de un pase
+### 10.2 Shader de un pase
 
 Se define como `FS_HEAD + cuerpo`. La cabecera ya trae todo lo de la sección 1.4, además de `vUv`, `outColor`, `uRes`, `uTime`, `uChA` a `uChC` (canal elegido para cada entrada ■) y `uHasA` a `uHasC`.
 
@@ -515,7 +573,7 @@ void main(){
 
 Sin `run`, Agnes usa `runGeneric`: enlaza las entradas, sube los parámetros y dibuja un pase en la capa del nodo.
 
-### 9.3 Varios pases con `run`
+### 10.3 Varios pases con `run`
 
 `run(n, ins, d)` recibe el nodo, las texturas de entrada ya evaluadas (`null` si no están conectadas) y la definición. Debe dejar el resultado en `n._out` (creado por Agnes, del tamaño del lienzo). Funciones útiles:
 
@@ -537,7 +595,7 @@ function runBlur(n,ins){
 
 El nodo Tramado (`runDither`) es el ejemplo de procesamiento en CPU: reduce la imagen con un pase, la lee con `readPixels`, aplica la difusión de error en JavaScript y sube el resultado como textura.
 
-### 9.4 Lo que Agnes hace por ti
+### 10.4 Lo que Agnes hace por ti
 
 - **Caché:** un nodo solo se recalcula si cambian sus parámetros, sus entradas o, si depende del tiempo, el cuadro.
 - **Interfaz:** el panel de parámetros, los puertos y el menú se generan a partir de `DEFS`.
