@@ -40,7 +40,7 @@
     {
       "name": "Bordes neón",
       "desc": "Contornos Sobel brillantes sobre la imagen oscurecida",
-      "code": "#effect Bordes neón\n#desc Contornos Sobel brillantes sobre la imagen oscurecida\n#input A Imagen\n\n#color neon #00f0ff\n#param fuerza 3 0 10\n#param fondo 0.25 0 1\n\nvec2 px = 1.0 / @res;\nfloat tl = luma(A(@uv + px * vec2(-1.0,  1.0)).rgb);\nfloat t  = luma(A(@uv + px * vec2( 0.0,  1.0)).rgb);\nfloat tr = luma(A(@uv + px * vec2( 1.0,  1.0)).rgb);\nfloat l  = luma(A(@uv + px * vec2(-1.0,  0.0)).rgb);\nfloat r  = luma(A(@uv + px * vec2( 1.0,  0.0)).rgb);\nfloat bl = luma(A(@uv + px * vec2(-1.0, -1.0)).rgb);\nfloat b  = luma(A(@uv + px * vec2( 0.0, -1.0)).rgb);\nfloat br = luma(A(@uv + px * vec2( 1.0, -1.0)).rgb);\nfloat gx = tr + 2.0 * r + br - tl - 2.0 * l - bl;\nfloat gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;\nfloat e = clamp(length(vec2(gx, gy)) * @fuerza, 0.0, 1.0);\n@out.rgb = @A.rgb * @fondo + @neon * e;\n"
+      "code": "#effect Bordes neón\n#desc Contornos Sobel brillantes sobre la imagen oscurecida\n#input A Imagen\n\n#color neon #00f0ff\n#param fuerza 3 0 10\n#param fondo 0.25 0 1\n\n// Luminancia de A desplazada (dx, dy) píxeles\nfloat L(float dx, float dy) {\n  return luma(A(@uv + vec2(dx, dy) / @res).rgb);\n}\n\nfloat gx = L(1.0, 1.0) + 2.0 * L(1.0, 0.0) + L(1.0, -1.0)\n         - L(-1.0, 1.0) - 2.0 * L(-1.0, 0.0) - L(-1.0, -1.0);\nfloat gy = L(-1.0, 1.0) + 2.0 * L(0.0, 1.0) + L(1.0, 1.0)\n         - L(-1.0, -1.0) - 2.0 * L(0.0, -1.0) - L(1.0, -1.0);\nfloat e = clamp(length(vec2(gx, gy)) * @fuerza, 0.0, 1.0);\n@out.rgb = @A.rgb * @fondo + @neon * e;\n"
     },
     {
       "name": "Desenfoque radial",

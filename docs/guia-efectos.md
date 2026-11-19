@@ -75,8 +75,9 @@ La carpeta [`efectos/`](../efectos) del repositorio tiene ejemplos listos para i
 Tu texto se procesa así:
 
 1. Las líneas `#param` y `#color` se quitan (quedan en blanco para que los números de línea coincidan) y se convierten en controles y `uniform`. Las de encabezado (`#effect`, `#desc`, `#input`) también se quitan.
-2. Cada `@nombre` se reemplaza por el identificador GLSL correspondiente (tabla 1.2).
-3. El resultado se inserta dentro de `main()`:
+2. Las **definiciones de función** y las líneas `#define` que estén fuera de cualquier bloque `{}` se mueven al ámbito global, antes de `main()` (sección 1.5).
+3. Cada `@nombre` se reemplaza por el identificador GLSL correspondiente (tabla 1.2).
+4. El resto se inserta dentro de `main()`:
 
 ```glsl
 #version 300 es
@@ -85,18 +86,21 @@ precision highp int;
 // ... cabecera con uniforms y funciones (sección 1.4) ...
 uniform float u_shift;            // generado por cada #param
 uniform vec3  u_tint;             // generado por cada #color
+vec4 _A, _B, _C, _out;            // globales: también se ven desde tus funciones
+// <<< TUS FUNCIONES Y #define, cada uno con #line para conservar su número de línea >>>
 void main(){
-  vec4 _A = texture(iA, vUv), _B = texture(iB, vUv), _C = texture(iC, vUv);
-  vec4 _out = _A;
+  _A = texture(iA, vUv); _B = texture(iB, vUv); _C = texture(iC, vUv);
+  _out = _A;
   #line 1
-  // <<< TU CÓDIGO VA AQUÍ >>>
+  // <<< EL RESTO DE TU CÓDIGO VA AQUÍ >>>
   outColor = _out;
 }
 ```
 
 Consecuencias:
 
-- Tu código es el **cuerpo de `main()`**: solo sentencias. **No puedes definir funciones** (da `'{' : syntax error`). Sí puedes usar `#define` para constantes o macros.
+- Todo lo que no sea una función ni un `#define` es el **cuerpo de `main()`**: sentencias que se ejecutan en orden.
+- Puedes **definir funciones auxiliares** en cualquier parte del snippet (sección 1.5).
 - `@out` **empieza igual a `@A`**. Si no lo tocas, el nodo deja pasar la entrada A.
 - Los números de línea de los errores corresponden a las líneas de tu snippet.
 
@@ -150,7 +154,34 @@ Uniforms que también puedes usar directamente, sin `@`:
 | `uHasA` `uHasB` `uHasC` | `float` | 1.0 si la entrada está conectada, 0.0 si no. |
 | `iA` `iB` `iC` | `sampler2D` | Las texturas de entrada, por si necesitas `textureSize` o `texelFetch`. |
 
-### 1.5 Convenciones de imagen
+### 1.5 Funciones auxiliares
+
+Escribe funciones GLSL normales en el snippet. Agnes las detecta y las mueve fuera de `main()`:
+
+```glsl
+#param fuerza 3 0 10
+
+// Luminancia de A desplazada (dx, dy) píxeles
+float L(float dx, float dy) {
+  return luma(A(@uv + vec2(dx, dy) / @res).rgb);
+}
+
+float gx = L(1.0, 0.0) - L(-1.0, 0.0);
+float gy = L(0.0, 1.0) - L(0.0, -1.0);
+@out.rgb = vec3(length(vec2(gx, gy)) * @fuerza);
+```
+
+Reglas:
+
+- Una función se reconoce cuando la línea empieza (fuera de cualquier `{}`) con un tipo de retorno (`void`, `float`, `int`, `bool`, `vec2`–`vec4`, `ivec*`, `bvec*`, `mat2`–`mat4`), un nombre y `(`. La firma puede ocupar varias líneas.
+- **Dentro de las funciones valen todos los `@`**: `@A`, `@uv`, `@res`, `@time`, `@Av` y tus parámetros. Una función `void` incluso puede modificar `@out`.
+- Desde el cuerpo puedes llamar a una función definida más abajo. Pero **una función que llama a otra necesita que la otra esté definida antes** (o declarada con un prototipo como `float g(float x);`), como en cualquier GLSL.
+- No pongas a tus funciones los nombres de la cabecera (`A`, `B`, `C`, `luma`, `pick`, `noise`, `fbm`, `hash13`, `vnoise`, `rgb2hsv`, `hsv2rgb`). Sí puedes **sobrecargarlas** con otra firma.
+- Las variables declaradas en el cuerpo **no** son visibles dentro de las funciones: pásalas como argumento.
+- Los `#define` fuera de bloques también se mueven al inicio, así que sirven dentro de las funciones.
+- Los errores dentro de una función muestran la línea correcta del snippet.
+
+### 1.6 Convenciones de imagen
 
 - Todas las capas tienen el tamaño del lienzo (`@res`). Las entradas ya llegan ajustadas a ese tamaño.
 - Los colores van de 0 a 1. Internamente las capas son de 16 bits flotantes (cuando el equipo lo permite), así que valores por encima de 1 sobreviven entre nodos; el visor y la exportación recortan a 0–1 al final.
@@ -172,7 +203,7 @@ p.x *= @res.x / @res.y;   // ahora length(p) mide igual en x y en y
 GLSL ES es estricto. Estas son las causas de error más comunes:
 
 1. **No hay conversión automática entre `int` y `float`.** Escribe `2.0`, no `2`. Convierte con `float(i)` e `int(x)`.
-2. **No se pueden definir funciones** en el snippet (sección 1.1). Repite el código, usa un bucle o un `#define`.
+2. **Una función debe estar definida antes que otra función que la llame** (sección 1.5).
 3. **Los tamaños de vector deben coincidir:** `vec3 c = @A;` falla; usa `@A.rgb`.
 4. **Cada sentencia termina en `;`.**
 5. Los bucles con límite variable están permitidos en ES 3.00, pero cada iteración cuesta en el teléfono (sección 4).
@@ -333,24 +364,22 @@ m = smoothstep(@umbral - @suavidad, @umbral + @suavidad, m);
 ```
 
 ### 5.9 Bordes neón
-Operador de Sobel desarrollado a mano, porque no se pueden definir funciones.
+Operador de Sobel con una función auxiliar `L()` que lee la luminancia desplazada.
 ```glsl
 // Bordes tipo neón (Sobel) sobre la imagen oscurecida
 #color neon #00f0ff
 #param fuerza 3 0 10
 #param fondo 0.25 0 1
 
-vec2 px = 1.0 / @res;
-float tl = luma(A(@uv + px * vec2(-1.0,  1.0)).rgb);
-float t  = luma(A(@uv + px * vec2( 0.0,  1.0)).rgb);
-float tr = luma(A(@uv + px * vec2( 1.0,  1.0)).rgb);
-float l  = luma(A(@uv + px * vec2(-1.0,  0.0)).rgb);
-float r  = luma(A(@uv + px * vec2( 1.0,  0.0)).rgb);
-float bl = luma(A(@uv + px * vec2(-1.0, -1.0)).rgb);
-float b  = luma(A(@uv + px * vec2( 0.0, -1.0)).rgb);
-float br = luma(A(@uv + px * vec2( 1.0, -1.0)).rgb);
-float gx = tr + 2.0 * r + br - tl - 2.0 * l - bl;
-float gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;
+// Luminancia de A desplazada (dx, dy) píxeles
+float L(float dx, float dy) {
+  return luma(A(@uv + vec2(dx, dy) / @res).rgb);
+}
+
+float gx = L(1.0, 1.0) + 2.0 * L(1.0, 0.0) + L(1.0, -1.0)
+         - L(-1.0, 1.0) - 2.0 * L(-1.0, 0.0) - L(-1.0, -1.0);
+float gy = L(-1.0, 1.0) + 2.0 * L(0.0, 1.0) + L(1.0, 1.0)
+         - L(-1.0, -1.0) - 2.0 * L(0.0, -1.0) - L(1.0, -1.0);
 float e = clamp(length(vec2(gx, gy)) * @fuerza, 0.0, 1.0);
 @out.rgb = @A.rgb * @fondo + @neon * e;
 ```
@@ -408,7 +437,8 @@ Los mensajes son los que da Chrome (con ANGLE); otros navegadores los redactan d
 | `cannot convert from 'const int' to 'highp 3-component vector of float'` | `@out.rgb *= 2;` | `@out.rgb *= 2.0;` |
 | `wrong operand types - no operation '*' exists … 'highp float' and … 'highp int'` | Mezclar `float` e `int` en una operación | `x * float(i)` |
 | `'u_nombre' : undeclared identifier` | Usaste `@nombre` sin declarar `#param` o `#color` (o hay un error de escritura en la directiva) | Agrega `#param nombre …` y revisa el formato (sección 1.3). |
-| `'{' : syntax error` en la línea de una función | Definiste una función | Escribe el código en línea, o usa un bucle o un `#define`. |
+| `'f' : no matching overloaded function found` | Llamaste a una función con tipos de argumento que no coinciden (por ejemplo `f(1)` cuando espera `float`), o una función llama a otra definida más abajo | Revisa los tipos (`f(1.0)`) o mueve la función llamada arriba. |
+| `'luma' : function already has a body` | Definiste una función con el mismo nombre y firma que una de la cabecera (o la definiste dos veces) | Cámbiale el nombre. |
 | `dimension mismatch` | Asignaste un `vec4` a un `vec3` (o al revés) | Usa `.rgb`, `.xy`, o construye `vec4(c, 1.0)`. |
 | `'_out' : syntax error` (o el siguiente identificador) | Falta `;` al final de la línea anterior | Agrega el `;`. |
 
@@ -419,7 +449,7 @@ Cuando el código no compila, Agnes muestra el error debajo del editor y el viso
 ## 8. Lista de verificación antes de entregar
 
 - [ ] Todos los literales que deben ser float tienen punto decimal (`1.0`, `0.5`).
-- [ ] No hay definiciones de función.
+- [ ] Si una función llama a otra, la llamada está definida antes. Ninguna función se llama como las de la cabecera.
 - [ ] Cada `@nombre` tiene su `#param` o `#color`, con números en decimal simple y colores de 6 dígitos.
 - [ ] Los rangos de `#param` son útiles: el mínimo y el máximo dan resultados razonables.
 - [ ] Si usas distancias o círculos, corregiste la proporción con `@res.x / @res.y`.
