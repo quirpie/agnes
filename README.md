@@ -23,6 +23,10 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 | Combinar | Mezclar |
 | Código | Código (GLSL por píxel) |
 
+## Crear efectos
+
+La guía completa para crear efectos, pensada también para que la usen otros LLMs, está en [`docs/guia-efectos.md`](docs/guia-efectos.md): contrato del nodo Código, funciones disponibles, reglas de GLSL ES, recetas probadas, errores comunes y cómo agregar nodos nativos.
+
 ## Nodo Código
 
 GLSL que se ejecuta en cada píxel, con atributos al estilo VEX:
