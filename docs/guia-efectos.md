@@ -115,13 +115,14 @@ Consecuencias:
 | `@P` | `gl_FragCoord.xy` | `vec2` | Coordenada en píxeles (centro del píxel: 0.5, 1.5, …). |
 | `@res` | `uRes` | `vec2` | Resolución del lienzo en píxeles (por ejemplo 960×540). |
 | `@time` | `uTime` | `float` | Segundos desde 0. **Si aparece `@time` en el texto, el nodo se recalcula en cada cuadro.** |
-| `@nombre` | `u_nombre` | `float` o `vec3` | Cualquier otro nombre: el parámetro declarado con `#param` o `#color`. Si no lo declaraste, da `'u_nombre' : undeclared identifier`. |
+| `@nombre` | `u_nombre` | `float`, `vec3` o `int` | Cualquier otro nombre: el parámetro declarado con `#param`, `#color` o `#enum`. Si no lo declaraste, da `'u_nombre' : undeclared identifier`. |
 
 ### 1.3 Directivas de parámetros
 
 ```glsl
 #param nombre valor_inicial mínimo máximo    // deslizador → @nombre (float)
 #color nombre #rrggbb                        // selector de color → @nombre (vec3, 0–1)
+#enum nombre Opción 1 | Opción 2 | Opción 3  // lista desplegable → @nombre (int: 0, 1, 2…)
 ```
 
 Reglas estrictas (se leen con una expresión regular, no con un analizador):
@@ -130,6 +131,7 @@ Reglas estrictas (se leen con una expresión regular, no con un analizador):
 - `nombre`: letras, dígitos y `_`, sin espacios.
 - Los números van en decimal simple: `0.5`, `-2`, `.25`. **No uses** notación científica (`1e-3`) ni signo `+`.
 - `#color` exige **6 dígitos hexadecimales** (`#ff8800`, no `#f80`).
+- `#enum` separa las opciones con `|` (pueden tener espacios). La primera es la inicial. `@nombre` es un `int`: compáralo con enteros, `if (@modo == 1)`. Úsalo para modos, en lugar de un `#param` que haya que redondear.
 - Los `#param` siempre son `float`. Si necesitas un entero, conviértelo: `int n = int(@pasos);`.
 - Si cambias el valor inicial en el código, el control se reinicia a ese valor.
 
@@ -494,7 +496,7 @@ Los mensajes son los que da Chrome (con ANGLE); otros navegadores los redactan d
 | `cannot convert from 'const int' to 'highp float'` | Literal entero donde va un float (`float x = 1;`) | Escribe `1.0`. |
 | `cannot convert from 'const int' to 'highp 3-component vector of float'` | `@out.rgb *= 2;` | `@out.rgb *= 2.0;` |
 | `wrong operand types - no operation '*' exists … 'highp float' and … 'highp int'` | Mezclar `float` e `int` en una operación | `x * float(i)` |
-| `'u_nombre' : undeclared identifier` | Usaste `@nombre` sin declarar `#param` o `#color` (o hay un error de escritura en la directiva) | Agrega `#param nombre …` y revisa el formato (sección 1.3). |
+| `'u_nombre' : undeclared identifier` | Usaste `@nombre` sin declarar `#param`, `#color` o `#enum` (o hay un error de escritura en la directiva) | Agrega la directiva y revisa el formato (sección 1.3). |
 | `'f' : no matching overloaded function found` | Llamaste a una función con tipos de argumento que no coinciden (por ejemplo `f(1)` cuando espera `float`), o una función llama a otra definida más abajo | Revisa los tipos (`f(1.0)`) o mueve la función llamada arriba. |
 | `'luma' : function already has a body` | Definiste una función con el mismo nombre y firma que una de la cabecera (o la definiste dos veces) | Cámbiale el nombre. |
 | `dimension mismatch` | Asignaste un `vec4` a un `vec3` (o al revés) | Usa `.rgb`, `.xy`, o construye `vec4(c, 1.0)`. |
@@ -508,7 +510,7 @@ Cuando el código no compila, Agnes muestra el error debajo del editor y el viso
 
 - [ ] Todos los literales que deben ser float tienen punto decimal (`1.0`, `0.5`).
 - [ ] Si una función llama a otra, la llamada está definida antes. Ninguna función se llama como las de la cabecera.
-- [ ] Cada `@nombre` tiene su `#param` o `#color`, con números en decimal simple y colores de 6 dígitos.
+- [ ] Cada `@nombre` tiene su `#param`, `#color` o `#enum`, con números en decimal simple y colores de 6 dígitos.
 - [ ] Los rangos de `#param` son útiles: el mínimo y el máximo dan resultados razonables.
 - [ ] Si usas distancias o círculos, corregiste la proporción con `@res.x / @res.y`.
 - [ ] `@out.a` tiene sentido (normalmente `@A.a` o `1.0`).

@@ -672,13 +672,15 @@ function buildSnippet(code){
   for(const ln of code.split('\n')){let m;
     if((m=ln.match(/^\s*#param\s+(\w+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/))){params.push({k:m[1],label:m[1],t:'float',v:+m[2],min:+m[3],max:+m[4]});body.push('');}
     else if((m=ln.match(/^\s*#color\s+(\w+)\s+(#[0-9a-fA-F]{6})/))){params.push({k:m[1],label:m[1],t:'color',v:m[2]});body.push('');}
+    else if((m=ln.match(/^\s*#enum\s+(\w+)\s+(.+)$/))){const opts=m[2].split('|').map(o=>o.trim()).filter(Boolean);
+      if(opts.length)params.push({k:m[1],label:m[1],t:'enum',opts,v:0});body.push('');}
     else if(/^\s*#(effect|desc|input)\b/.test(ln))body.push('');
     else body.push(ln);}
   const MAP={A:'_A',B:'_B',C:'_C',Av:'pick(_A,uChA)',Bv:'pick(_B,uChB)',Cv:'pick(_C,uChC)',uv:'vUv',P:'gl_FragCoord.xy',res:'uRes',time:'uTime',out:'_out'};
   const sub=t=>t.replace(/@(\w+)/g,(s,k)=>MAP[k]||('u_'+k));
   /* funciones auxiliares y #define fuera de bloques → ámbito global, con #line para que los errores apunten a la línea original */
   const sp=splitGlobals(body.join('\n'));
-  const decl=params.map(p=>`uniform ${p.t==='color'?'vec3':'float'} u_${p.k};`).join('\n');
+  const decl=params.map(p=>`uniform ${p.t==='color'?'vec3':p.t==='enum'?'int':'float'} u_${p.k};`).join('\n');
   const glob=sp.globals.map(g=>`#line ${g.line}\n${sub(g.text)}`).join('\n');
   const fs=FS_HEAD+decl+'\nvec4 _A,_B,_C,_out;\n'+glob+'\nvoid main(){\n_A=texture(iA,vUv);_B=texture(iB,vUv);_C=texture(iC,vUv);\n_out=_A;\n#line 1\n'+sub(sp.body)+'\noutColor=_out;\n}';
   return{params,fs};
@@ -987,6 +989,7 @@ function renderParams(){
     <li><code>@out</code>: resultado (vec4), empieza igual a <code>@A</code></li>
     <li><code>#param nombre def min max</code>: crea un deslizador, se usa como <code>@nombre</code></li>
     <li><code>#color nombre #rrggbb</code>: crea un selector de color</li>
+    <li><code>#enum nombre Opción 1 | Opción 2</code>: crea una lista; <code>@nombre</code> es un int (0, 1, …)</li>
     <li>Funciones: <code>luma</code>, <code>noise</code>, <code>fbm(vec3 p, int oct)</code>, <code>rgb2hsv</code>, <code>hsv2rgb</code></li>
     <li>Puedes definir funciones auxiliares (antes de usarlas); dentro de ellas también valen los <code>@</code></li>
     <li>Encabezado de efecto: <code>#effect Nombre</code>, <code>#desc …</code>, <code>#input A Etiqueta</code></li></ul></details>

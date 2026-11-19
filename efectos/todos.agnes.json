@@ -61,6 +61,11 @@
       "name": "Pulso",
       "desc": "Zoom y brillo que laten con los graves del audio",
       "code": "#effect Pulso\n#desc Zoom y brillo que laten con los graves del audio\n#input A Imagen\n#input B Audio\n\n#param zoom 0.08 0 0.3\n#param brillo 0.6 0 2\n#color destello #ffd9a0\n\n// Conecta un nodo Audio (capa «Valores») a la entrada B:\n// @B.r = volumen, @B.g = graves, @B.b = agudos\nfloat graves = @B.g;\nvec2 c = @uv - 0.5;\nvec4 col = A(0.5 + c / (1.0 + @zoom * graves));\ncol.rgb += @destello * @brillo * graves * graves;\n@out = vec4(col.rgb, col.a);\n"
+    },
+    {
+      "name": "Anaglifo 3D",
+      "desc": "Fusiona el ojo izquierdo (rojo) y el derecho (cian) como el cine 3D clásico",
+      "code": "#effect Anaglifo 3D\n#desc Fusiona el ojo izquierdo (rojo) y el derecho (cian) como el cine 3D clásico\n#input A Ojo izquierdo\n#input B Ojo derecho\n#input C Profundidad scalar\n\n#enum modo Color | Grises | Optimizado (Dubois)\n#param separacion 6 -40 40\n#color izquierda #ff0000\n#color derecha #00ffff\n\n// A = ojo izquierdo, B = ojo derecho. Si B no está conectada, el par se\n// inventa desplazando A. Con un mapa en C (claro = cerca), el desplazamiento\n// cambia por píxel y la imagen gana relieve.\nfloat k = uHasC > 0.5 ? (@Cv - 0.5) * 2.0 : 1.0;\nvec2 off = vec2(@separacion * k * 0.5 / @res.x, 0.0);\nvec4 L = A(@uv + off);\nvec4 R = uHasB > 0.5 ? B(@uv - off) : A(@uv - off);\n\nvec3 col;\nif (@modo == 1) {\n  // Grises: menos rivalidad de color, más cómodo de ver\n  col = luma(L.rgb) * @izquierda + luma(R.rgb) * @derecha;\n} else if (@modo == 2) {\n  // Matrices de Dubois para rojo/cian: menos \"fantasmas\"\n  col = vec3(\n    dot(L.rgb, vec3( 0.456,  0.500,  0.176)) + dot(R.rgb, vec3(-0.043, -0.088, -0.002)),\n    dot(L.rgb, vec3(-0.040, -0.038, -0.016)) + dot(R.rgb, vec3( 0.378,  0.734, -0.018)),\n    dot(L.rgb, vec3(-0.015, -0.021, -0.005)) + dot(R.rgb, vec3(-0.072, -0.113,  1.226)));\n} else {\n  // Color: cada ojo pasa por su filtro\n  col = L.rgb * @izquierda + R.rgb * @derecha;\n}\n@out = vec4(clamp(col, 0.0, 1.0), max(L.a, R.a));\n"
     }
   ]
 }
