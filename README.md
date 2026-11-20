@@ -13,6 +13,8 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 - El ojo de cada nodo lo muestra en el visor.
 - **Edición**: Secuencia une hasta 8 clips en orden, con transiciones integradas o cualquier efecto con `@progreso`. El audio de cada video sigue sus recortes, velocidad (también en reversa) y transiciones, en la vista previa y en el MP4.
 - **Editor de la Secuencia**: al seleccionar una Secuencia aparece su línea de tiempo, con los clips como bloques con miniaturas y forma de onda. Arrastra los bordes para recortar, arrastra el bloque para reordenar, divide en el cabezal, mueve, quita o abre el nodo de cada clip. Los recortes se guardan en la propia Secuencia y funcionan con cualquier clip.
+- **Fotogramas clave**: el botón ◆ junto a cualquier parámetro numérico lo anima en el tiempo (suave, lineal o escalón), también los `#param` de los efectos.
+- **Cortes al ritmo**: la Secuencia detecta los golpes de un nodo Audio y ajusta los clips para que cada corte caiga en un golpe (cada 1, 2, 4 u 8), repitiendo clips si hace falta (hasta 16).
 - **Línea de tiempo**: barra con cabezal, avance cuadro por cuadro (← →), duración del proyecto y repetición.
 - **Exportar**: foto (PNG/JPG) o video MP4 renderizado cuadro por cuadro.
 - **Audio**: el nodo Audio analiza un archivo de audio (o el audio de un video). Su capa lleva volumen, graves y agudos, y el botón ♪ junto a cualquier parámetro lo hace reaccionar al sonido. El video exportado incluye el audio.
@@ -56,5 +58,6 @@ Funciones: `luma`, `noise`, `fbm(vec3 p, int oct)`, `rgb2hsv`, `hsv2rgb`.
 - WebGL2 con texturas de 16 bits flotantes cuando el equipo las soporta; evaluación perezosa con caché por nodo y por instante. El tiempo es un argumento de la evaluación: los nodos de tiempo piden su entrada en otro instante, y cada video se adelanta al cuadro que el grafo necesita.
 - El tramado por difusión de error (Atkinson, Floyd–Steinberg) se calcula en CPU sobre la cuadrícula reducida.
 - La exportación de video usa WebCodecs (`VideoEncoder` y `AudioEncoder`) y un empaquetador MP4 propio, para que la duración y los cuadros sean exactos. El audio va en AAC, u Opus si el navegador no codifica AAC.
+- Exportación con decodificación rápida: un lector MP4 propio y `VideoDecoder` (WebCodecs) entregan cada cuadro exacto sin saltar por el reproductor; si el archivo no es compatible (girado, fragmentado, códec no soportado) se usa el reproductor.
 - El análisis de audio (FFT de 2048 muestras con ventana de Hann) se calcula sobre el audio decodificado en función del tiempo, así que la exportación cuadro por cuadro queda sincronizada.
 - El grafo y la biblioteca de efectos se guardan en el `localStorage` del navegador (`agnes-graph-v1` y `agnes-effects-v1`); las fotos y videos cargados no se guardan. Un grafo guarda también una copia del código de cada efecto que usa: si el efecto se borra de la biblioteca, sus nodos pasan a ser nodos Código y siguen funcionando.

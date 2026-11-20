@@ -455,7 +455,7 @@ valor = valor del deslizador + cantidad × señal
 
 donde la señal es el volumen, los graves, los medios o los agudos (0–1) del nodo Audio elegido. El resultado se limita al rango del parámetro, y la cantidad puede ser negativa. Funciona con los parámetros de los nodos nativos, de los nodos Código y de los efectos importados (los `#param`). Un cable punteado verde une el nodo Audio con cada nodo que controla.
 
-Si un efecto expone un `#param` con un rango razonable, el usuario puede animarlo con audio sin cambiar tu código. Por eso conviene que los parámetros principales sean `#param` y no constantes.
+Si un efecto expone un `#param` con un rango razonable, el usuario puede animarlo con audio o con fotogramas clave (botón ◆) sin cambiar tu código. Por eso conviene que los parámetros principales sean `#param` y no constantes.
 
 ### 6.3 Sincronía y exportación
 
