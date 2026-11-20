@@ -53,12 +53,14 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 330px;
 .fab{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;z-index:4}
 .fab button{height:36px;background:#1f2126}
 .fab .add{background:var(--acc);color:#1a1205;border-color:transparent;font-weight:600}
-#menu{position:absolute;right:10px;bottom:54px;width:250px;max-height:calc(100% - 64px);overflow:auto;background:#1b1c20;border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:5}
+#menu{position:absolute;right:10px;bottom:54px;width:min(280px,calc(100% - 20px));max-height:calc(100% - 64px);overflow:auto;background:#1b1c20;border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:5}
 #menu[hidden]{display:none}
 #menu h6{margin:8px 8px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);font-weight:600}
-#menu button{width:100%;border:0;background:transparent;justify-content:flex-start;height:32px;gap:9px}
+#menu button{width:100%;border:0;background:transparent;justify-content:flex-start;height:auto;min-height:34px;padding:5px 10px;gap:10px;text-align:left}
+#menu .mi{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.25}
+#menu .mi b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #menu button:hover{background:#26282e}
-#menu small{margin-left:auto;color:var(--mute);font-size:11px}
+#menu small{color:var(--mute);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#2a1416;color:#ffb3bb;border:1px solid #5a2228;padding:6px 12px;border-radius:8px;font-size:12px;z-index:6;pointer-events:none}
 #params{grid-area:params;border-left:1px solid var(--line);background:var(--panel);overflow:auto;min-height:0}
 .ph{position:sticky;top:0;background:var(--panel);display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);z-index:1}
@@ -133,7 +135,7 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
 .saverow input{flex:1;min-width:0;height:30px;background:#101114;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:0 8px;font:inherit}
 .fxbtns{display:flex;gap:8px;margin-top:10px}
 .fxbtns button{flex:1;justify-content:center}
-#menu .manage{color:var(--fx);justify-content:center;border-top:1px solid var(--line)!important;border-radius:0;margin-top:4px}
+#menu .manage{color:var(--fx);justify-content:center;white-space:nowrap;font-size:12.5px;border-top:1px solid var(--line)!important;border-radius:0;margin-top:4px}
 .toast.okt{background:#14261b;color:#9be6b9;border-color:#245a36}
 #exp .btns button,#expRec{flex:1;height:38px;justify-content:center}
 .primary{background:var(--acc)!important;color:#1a1205!important;border-color:transparent!important;font-weight:600}
@@ -944,9 +946,9 @@ graphEl.addEventListener('click',e=>{const eye=e.target.closest('.node .eye');if
 
 /* Menú de nodos */
 function buildMenu(){let h='';for(const c in CATS){const items=Object.entries(DEFS).filter(([,d])=>d.cat===c);if(!items.length)continue;
-  h+=`<h6>${CATS[c]}</h6>`+items.map(([k,d])=>`<button data-type="${esc(k)}"><span class="cat" style="--c:var(--${d.cat})"></span>${esc(d.name)}<small>${esc(d.desc||'')}</small></button>`).join('');}
+  h+=`<h6>${CATS[c]}</h6>`+items.map(([k,d])=>`<button data-type="${esc(k)}" title="${esc(d.name+(d.desc?' — '+d.desc:''))}"><span class="cat" style="--c:var(--${d.cat})"></span><span class="mi"><b>${esc(d.name)}</b>${d.desc?`<small>${esc(d.desc)}</small>`:''}</span></button>`).join('');}
   if(!FX.length)h+=`<h6>${CATS.fx}</h6>`;
-  h+=`<button class="manage" data-manage>${ICON.puzzle}Importar o administrar efectos…</button>`;
+  h+=`<button class="manage" data-manage title="Importar o administrar efectos">${ICON.puzzle}Importar o administrar…</button>`;
   menuEl.innerHTML=h;}
 function closeMenu(){menuEl.hidden=true;}
 menuEl.addEventListener('click',e=>{if(e.target.closest('[data-manage]')){openFx();return;}const b=e.target.closest('button[data-type]');if(b)addNode(b.dataset.type);});
