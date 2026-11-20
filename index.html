@@ -15,6 +15,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1p
 .brand{font-weight:600;letter-spacing:.02em;margin-right:4px}.brand span{color:var(--mute);font-weight:400;margin-left:6px;font-size:12px}
 button,select{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:7px;height:30px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 button:hover,select:hover{border-color:#3d4047}
+button:disabled{opacity:.35;cursor:default}
 button svg{width:15px;height:15px;flex:none}
 .icon{padding:0;width:30px;justify-content:center}
 #time{font:12px 'JetBrains Mono',monospace;color:var(--mute);min-width:58px;cursor:pointer}
@@ -208,6 +209,8 @@ code{font:11px 'JetBrains Mono',monospace;color:var(--acc)}
   <div class="brand">Agnes<span>compositor por capas</span></div>
   <select id="res" title="Tamaño del lienzo"></select>
   <span class="spacer"></span>
+  <button id="undoBtn" class="icon" title="Deshacer (Ctrl+Z)" disabled></button>
+  <button id="redoBtn" class="icon" title="Rehacer (Ctrl+Shift+Z)" disabled></button>
   <button id="fxBtn" title="Mis efectos: importar y administrar"></button>
   <button id="exportBtn" title="Exportar foto o video"></button>
   <button id="reset" title="Restaurar el grafo de ejemplo"></button>
@@ -303,6 +306,8 @@ const ICON={
  cut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></svg>',
  diamond:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 9-9 9-9-9z"/></svg>',
  diamondO:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4l8 8-8 8-8-8z"/></svg>',
+ undo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
+ redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>',
  wave:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>',
  puzzle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4h3a2 2 0 1 1 4 0h3v5a2 2 0 1 1 0 4v6h-5a2 2 0 1 0-4 0H5v-5a2 2 0 1 0 0-4V4z"/></svg>',
  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>',
@@ -1132,7 +1137,7 @@ function connect(src,dst,k){if(!src||!dst||src===dst)return;if(dependsOn(src,dst
 function select(id){selId=id;refreshClasses();renderParams();if(id)paramsEl.classList.remove('collapsed');
   const n=byId(id);if(n&&n.type==='seq'&&tlSeqId!==id){tlSeqId=id;tlSel=null;tlPxps=0;}scheduleTimeline();}
 function setDisplay(id){displayId=id;viewDirty=true;refreshClasses();updateInfo();scheduleSave();}
-function deleteNode(id){const n=byId(id);if(!n)return;dispose(n);nodes=nodes.filter(m=>m!==n);
+function deleteNode(id){const n=byId(id);if(!n)return;stash(n);nodes=nodes.filter(m=>m!==n);
   nodes.forEach(m=>{for(const k in m.inputs)if(m.inputs[k]===id){delete m.inputs[k];invalidate(m);}
     if(m.mod){for(const k in m.mod)if(m.mod[k].src===id){delete m.mod[k];invalidate(m);}if(!Object.keys(m.mod).length)delete m.mod;}});
   if(displayId===id)displayId=nodes.length?nodes[nodes.length-1].id:null;
@@ -1609,8 +1614,44 @@ new ResizeObserver(()=>{if(tlSeqId)scheduleTimeline();}).observe(tlScroll);
 
 /* ---------------- Guardado local ---------------- */
 const KEY='agnes-graph-v1',OLD_KEY='nodal-graph-v1';let saveT;
-function scheduleSave(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify({res:resIdx,display:displayId,nextId,view,projDur,loopOn,
-  nodes:nodes.map(n=>{const o={id:n.id,type:n.type,x:n.x,y:n.y,p:n.p,inputs:n.inputs,ch:n.ch};if(n.mod)o.mod=n.mod;if(n.anim)o.anim=n.anim;if(DEFS[n.type]&&DEFS[n.type].fx)o.fxcode=codeOf(n);return o;})}));}catch(_){}},400);}
+/* ---- Deshacer / rehacer: instantáneas del proyecto (los cambios seguidos se agrupan) ---- */
+let hist=[],hIdx=-1,restoring=false;const limbo=new Map(),HMAX=100;
+function stash(n){/* sale del grafo pero conserva su video/audio/imagen por si se deshace */
+  if(n._video)n._video.pause();if(n._audio)n._audio.pause();freeCache(n);freeTarget(n._tmp);freeTarget(n._small);n._tmp=n._small=null;limbo.set(n.id,n);}
+function snapNodes(){return nodes.map(n=>{const o={id:n.id,type:n.type,x:n.x,y:n.y,p:n.p,inputs:n.inputs,ch:n.ch};if(n.mod)o.mod=n.mod;if(n.anim)o.anim=n.anim;if(DEFS[n.type]&&DEFS[n.type].fx)o.fxcode=codeOf(n);return o;});}
+function snapshot(){return JSON.stringify({res:resIdx,display:displayId,projDur,loopOn,nodes:snapNodes()});}
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify({res:resIdx,display:displayId,nextId,view,projDur,loopOn,nodes:snapNodes()}));}catch(_){}}
+function commitState(){clearTimeout(saveT);saveT=0;const sn=snapshot();
+  if(sn!==hist[hIdx]){hist=hist.slice(0,hIdx+1);hist.push(sn);if(hist.length>HMAX)hist.shift();hIdx=hist.length-1;updateUndo();}
+  saveLocal();}
+function scheduleSave(){if(restoring)return;clearTimeout(saveT);saveT=setTimeout(commitState,400);}
+function updateUndo(){const u=$('#undoBtn'),r=$('#redoBtn');if(u)u.disabled=hIdx<=0;if(r)r.disabled=hIdx>=hist.length-1;}
+const clone=o=>o==null?o:JSON.parse(JSON.stringify(o));
+function restoreSnap(str){
+  const s=JSON.parse(str);restoring=true;
+  try{
+    const cur=new Map(nodes.map(n=>[n.id,n])),next=[];
+    for(const sn of s.nodes){let type=sn.type,p=clone(sn.p);
+      if(typeof type==='string'&&type.startsWith('fx:')&&!DEFS[type]){type='snippet';p=Object.assign({},p,{code:sn.fxcode||''});}
+      if(!DEFS[type])continue;
+      let n=cur.get(sn.id)||limbo.get(sn.id);if(n&&n.type!==type&&!(n.type.startsWith('fx:')||type==='snippet'))n=null;
+      if(!n)n={id:sn.id,type};limbo.delete(sn.id);cur.delete(sn.id);
+      n.type=type;n.x=sn.x;n.y=sn.y;n.p=p;n.inputs=Object.assign({},sn.inputs);n.ch=Object.assign({},sn.ch);
+      if(sn.mod)n.mod=clone(sn.mod);else delete n.mod;if(sn.anim)n.anim=clone(sn.anim);else delete n.anim;
+      n._valid=false;n._code=null;next.push(n);}
+    for(const n of cur.values())stash(n);
+    nodes=next;nodes.forEach(n=>{invalidate(n);});
+    const mx=Math.max(0,...nodes.map(n=>+String(n.id).slice(1)||0),...[...limbo.keys()].map(k=>+String(k).slice(1)||0));nextId=Math.max(nextId,mx+1);
+    displayId=byId(s.display)?s.display:(nodes[0]||{}).id||null;if(!byId(selId))selId=null;if(tlSeqId&&!byId(tlSeqId))tlSeqId=null;
+    if(RES[s.res]&&s.res!==resIdx){setRes(s.res);resSel.value=String(s.res);}
+    if(s.projDur>0&&Math.abs(s.projDur-projDur)>1e-6)setProjDur(s.projDur);
+    if(typeof s.loopOn==='boolean'&&s.loopOn!==loopOn){loopOn=s.loopOn;loopBtn.classList.toggle('on',loopOn);}
+    viewDirty=true;renderGraph();renderParams();scheduleTimeline();updateInfo();
+  }finally{restoring=false;}
+  saveLocal();
+}
+function undo(){if(saveT)commitState();if(hIdx<=0)return;hIdx--;restoreSnap(hist[hIdx]);updateUndo();}
+function redo(){if(saveT)commitState();if(hIdx>=hist.length-1)return;hIdx++;restoreSnap(hist[hIdx]);updateUndo();}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem(OLD_KEY)||'null');if(!s||!Array.isArray(s.nodes)||!s.nodes.length)return false;
   /* un efecto que ya no está en la biblioteca se convierte en nodo Código con su copia del código */
   s.nodes.forEach(n=>{if(n&&typeof n.type==='string'&&n.type.startsWith('fx:')&&!DEFS[n.type]){n.type='snippet';n.p=Object.assign({},n.p,{code:n.fxcode||''});}});
@@ -1622,7 +1663,7 @@ function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||localStorage.g
   if(s.projDur>0)projDur=+s.projDur;if(typeof s.loopOn==='boolean')loopOn=s.loopOn;
   return nodes.length>0;}catch(_){return false;}}
 function demo(){
-  nodes.forEach(dispose);nodes=[];nextId=1;
+  nodes.forEach(stash);nodes=[];nextId=Math.max(nextId,1);
   const img=mkNode('image',0,0);
   const nz=mkNode('noise',0,175,{scale:3,contrast:1.6});
   const at=mkNode('attr',195,205,{lo:.45,hi:.7},{src:nz.id});
@@ -1675,7 +1716,11 @@ const resetBtn=$('#reset');let resetArm=0;
 function resetLabel(){resetBtn.innerHTML=ICON.reset+(resetArm?'¿Seguro?':'');resetBtn.classList.toggle('icon',!resetArm);}
 resetBtn.onclick=()=>{if(!resetArm){resetArm=setTimeout(()=>{resetArm=0;resetLabel();},2500);resetLabel();return;}
   clearTimeout(resetArm);resetArm=0;resetLabel();demo();renderGraph();renderParams();requestAnimationFrame(fitView);scheduleSave();};
-document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select'))return;
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
+    if(e.target.closest('input[type=text],input:not([type]),textarea'))return;   /* deshacer del propio texto */
+    e.preventDefault();if(e.key==='y'||e.key==='Y'||e.shiftKey)redo();else undo();return;}
+  if(e.target.closest('input,textarea,select'))return;
   if(e.key===' '){e.preventDefault();setPlaying(!playing);}
   else if(e.key==='ArrowLeft'){e.preventDefault();$('#tPrev').click();}
   else if(e.key==='ArrowRight'){e.preventDefault();$('#tNext').click();}
@@ -1967,11 +2012,13 @@ function initExport(){
 canvas.width=W;canvas.height=H;
 loadFX();
 const restored=load();if(!restored)demo();
+$('#undoBtn').innerHTML=ICON.undo;$('#redoBtn').innerHTML=ICON.redo;$('#undoBtn').onclick=undo;$('#redoBtn').onclick=redo;
 resSel.innerHTML=RES.map((r,i)=>`<option value="${i}"${i===resIdx?' selected':''}>${r[2]}</option>`).join('');
 resSel.onchange=e=>{setRes(+e.target.value);updateInfo();scheduleSave();};
 setProjDur(projDur);loopBtn.classList.toggle('on',loopOn);
 resetLabel();buildMenu();setPlaying(true);renderGraph();renderParams();
 if(window.matchMedia('(max-width:760px)').matches)paramsEl.classList.add('collapsed');
+hist=[];hIdx=-1;commitState();
 requestAnimationFrame(()=>{fitView();requestAnimationFrame(loop);});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{uploadTex(DEFAULT_IMG,patternCanvas());nodes.forEach(n=>{if(n.type==='image'&&!n._own)invalidate(n);});renderGraph();});
 initExport();initFx();

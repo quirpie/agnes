@@ -13,6 +13,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 - El ojo de cada nodo lo muestra en el visor.
 - **Edición**: Secuencia une hasta 8 clips en orden, con transiciones integradas o cualquier efecto con `@progreso`. El audio de cada video sigue sus recortes, velocidad (también en reversa) y transiciones, en la vista previa y en el MP4.
 - **Editor de la Secuencia**: al seleccionar una Secuencia aparece su línea de tiempo, con los clips como bloques con miniaturas y forma de onda. Arrastra los bordes para recortar, arrastra el bloque para reordenar, divide en el cabezal, mueve, quita o abre el nodo de cada clip. Los recortes se guardan en la propia Secuencia y funcionan con cualquier clip.
+- **Deshacer / rehacer**: botones ↶ ↷ o Ctrl/Cmd+Z y Ctrl+Shift+Z (o Ctrl+Y). Hasta 100 pasos; los cambios seguidos se agrupan. Un nodo borrado vuelve con su archivo cargado.
 - **Fotogramas clave**: el botón ◆ junto a cualquier parámetro numérico lo anima en el tiempo (suave, lineal o escalón), también los `#param` de los efectos.
 - **Cortes al ritmo**: la Secuencia detecta los golpes de un nodo Audio y ajusta los clips para que cada corte caiga en un golpe (cada 1, 2, 4 u 8), repitiendo clips si hace falta (hasta 16).
 - **Línea de tiempo**: barra con cabezal, avance cuadro por cuadro (← →), duración del proyecto y repetición.
