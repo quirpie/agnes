@@ -234,6 +234,7 @@ vec3 col = src.rgb;
 
 - **Un solo pase.** Cada píxel se calcula de forma independiente y solo puede leer las entradas A, B y C, no el resultado de otros píxeles de este mismo nodo. Para efectos de varios pases (por ejemplo, desenfoque separable o bloom), **encadena varios nodos Código** o escribe un nodo nativo (sección 10).
 - **Sin memoria entre cuadros.** No hay acceso al cuadro anterior; la animación sale solo de `@time`.
+- **`@time` es el tiempo del nodo, no siempre el del proyecto.** Si el efecto está después de un nodo Recortar o Velocidad, `@time` es el instante que esos nodos le piden (por ejemplo, va hacia atrás en reversa).
 - **Máximo 3 entradas** (A, B, C).
 - **Rendimiento:** el código corre una vez por píxel en cada cuadro (unos 500 000 píxeles a 960×540, casi 1 millón a 1280×720). En un teléfono de gama media, procura no pasar de unas **32 lecturas de textura** por píxel. Los bucles de 64 o más lecturas se notan.
 - `@time` en cualquier parte del texto, incluso en un comentario, hace que el nodo se recalcule en cada cuadro. Si el efecto no se anima, no lo menciones.
@@ -470,6 +471,8 @@ A veces es mejor armar un grafo que escribir código. Estos son los nodos nativo
 |---|---|---|
 | Imagen | — | Carga una foto. |
 | Audio | — | Analiza un audio: capa con volumen, graves y agudos; espectro u onda. |
+| Recortar | Clip | Muestra el tramo entrada–salida del clip a partir del segundo «Empieza en»; fuera del rango, transparente, congelado o en bucle. |
+| Velocidad | Clip | Cambia la velocidad (negativa = reversa, 0 = congelado) desde un instante dado. |
 | Texto | — | Texto con fuente, contorno, sombra y animación de escritura, sobre fondo transparente (combínalo con Mezclar). |
 | Video | — | Carga un video (sin audio). |
 | Ruido | — | Ruido fractal, gris, color o vector; animable. |

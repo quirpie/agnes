@@ -11,6 +11,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 - Arrastra desde la salida ● de un nodo hasta la entrada de otro.
 - Las entradas ámbar ■ reciben un atributo: eliges el canal y controla un parámetro.
 - El ojo de cada nodo lo muestra en el visor.
+- **Línea de tiempo**: barra con cabezal, avance cuadro por cuadro (← →), duración del proyecto y repetición.
 - **Exportar**: foto (PNG/JPG) o video MP4 renderizado cuadro por cuadro.
 - **Audio**: el nodo Audio analiza un archivo de audio (o el audio de un video). Su capa lleva volumen, graves y agudos, y el botón ♪ junto a cualquier parámetro lo hace reaccionar al sonido. El video exportado incluye el audio.
 - **Efectos**: importa efectos (archivos `.glsl`/`.json` o código pegado), que se guardan en el navegador y aparecen en **+ Nodo → Mis efectos**. Un nodo Código también se puede guardar como efecto. Hay ejemplos en [`efectos/`](efectos).
@@ -20,6 +21,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 | Categoría | Nodos |
 |---|---|
 | Fuentes | Imagen, Video, Audio, Texto, Ruido, Degradado |
+| Tiempo | Recortar (entrada, salida, posición), Velocidad (lenta, rápida, reversa) |
 | Filtros | Color, Gradación, Desenfoque, Transformar, Desplazar, Tramado, Bordes |
 | Atributos | Atributo (canal → máscara) |
 | Combinar | Mezclar |
@@ -49,7 +51,7 @@ Funciones: `luma`, `noise`, `fbm(vec3 p, int oct)`, `rgb2hsv`, `hsv2rgb`.
 
 ## Detalles técnicos
 
-- WebGL2 con texturas de 16 bits flotantes cuando el equipo las soporta; evaluación perezosa y caché por nodo.
+- WebGL2 con texturas de 16 bits flotantes cuando el equipo las soporta; evaluación perezosa con caché por nodo y por instante. El tiempo es un argumento de la evaluación: los nodos de tiempo piden su entrada en otro instante, y cada video se adelanta al cuadro que el grafo necesita.
 - El tramado por difusión de error (Atkinson, Floyd–Steinberg) se calcula en CPU sobre la cuadrícula reducida.
 - La exportación de video usa WebCodecs (`VideoEncoder` y `AudioEncoder`) y un empaquetador MP4 propio, para que la duración y los cuadros sean exactos. El audio va en AAC, u Opus si el navegador no codifica AAC.
 - El análisis de audio (FFT de 2048 muestras con ventana de Hann) se calcula sobre el audio decodificado en función del tiempo, así que la exportación cuadro por cuadro queda sincronizada.
