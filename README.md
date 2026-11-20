@@ -19,8 +19,8 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 
 | Categoría | Nodos |
 |---|---|
-| Fuentes | Imagen, Video, Audio, Ruido, Degradado |
-| Filtros | Color, Desenfoque, Transformar, Desplazar, Tramado, Bordes |
+| Fuentes | Imagen, Video, Audio, Texto, Ruido, Degradado |
+| Filtros | Color, Gradación, Desenfoque, Transformar, Desplazar, Tramado, Bordes |
 | Atributos | Atributo (canal → máscara) |
 | Combinar | Mezclar |
 | Código | Código (GLSL por píxel) |

@@ -470,10 +470,12 @@ A veces es mejor armar un grafo que escribir código. Estos son los nodos nativo
 |---|---|---|
 | Imagen | — | Carga una foto. |
 | Audio | — | Analiza un audio: capa con volumen, graves y agudos; espectro u onda. |
+| Texto | — | Texto con fuente, contorno, sombra y animación de escritura, sobre fondo transparente (combínalo con Mezclar). |
 | Video | — | Carga un video (sin audio). |
 | Ruido | — | Ruido fractal, gris, color o vector; animable. |
 | Degradado | — | Lineal o radial entre dos colores. |
 | Color | Entrada, ■ Máscara | Brillo, contraste, saturación, tono, gamma. |
+| Gradación | Entrada, ■ Máscara | Exposición, temperatura, matiz, contraste, color de sombras/medios/luces, saturación, vibración, desvanecido y preajustes. |
 | Desenfoque | Entrada, ■ Mapa tamaño | Desenfoque gaussiano; el mapa controla el radio por píxel. |
 | Transformar | Entrada | Mover, escalar, rotar; bordes vacíos, repetidos o en espejo. |
 | Desplazar | Entrada, ■ Campo | Deforma según el gradiente de un canal o un vector RG. |
