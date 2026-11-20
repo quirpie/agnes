@@ -11,6 +11,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 - Arrastra desde la salida ● de un nodo hasta la entrada de otro.
 - Las entradas ámbar ■ reciben un atributo: eliges el canal y controla un parámetro.
 - El ojo de cada nodo lo muestra en el visor.
+- **Edición**: Secuencia une hasta 8 clips en orden, con transiciones integradas o cualquier efecto con `@progreso`. El audio de cada video sigue sus recortes, velocidad (también en reversa) y transiciones, en la vista previa y en el MP4.
 - **Línea de tiempo**: barra con cabezal, avance cuadro por cuadro (← →), duración del proyecto y repetición.
 - **Exportar**: foto (PNG/JPG) o video MP4 renderizado cuadro por cuadro.
 - **Audio**: el nodo Audio analiza un archivo de audio (o el audio de un video). Su capa lleva volumen, graves y agudos, y el botón ♪ junto a cualquier parámetro lo hace reaccionar al sonido. El video exportado incluye el audio.
@@ -21,7 +22,7 @@ Es un solo archivo, `index.html`, sin dependencias ni compilación. Ábrelo en u
 | Categoría | Nodos |
 |---|---|
 | Fuentes | Imagen, Video, Audio, Texto, Ruido, Degradado |
-| Tiempo | Recortar (entrada, salida, posición), Velocidad (lenta, rápida, reversa) |
+| Tiempo | Recortar (entrada, salida, posición), Velocidad (lenta, rápida, reversa), Secuencia (une clips con transiciones y su audio) |
 | Filtros | Color, Gradación, Desenfoque, Transformar, Desplazar, Tramado, Bordes |
 | Atributos | Atributo (canal → máscara) |
 | Combinar | Mezclar |

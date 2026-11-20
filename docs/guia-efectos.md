@@ -463,6 +463,36 @@ El análisis se calcula a partir del audio decodificado y del tiempo, no en vivo
 
 ---
 
+## 6.4 Transiciones para Secuencia
+
+Un efecto puede servir como transición del nodo Secuencia si declara un parámetro **`progreso`**. Secuencia lo controla durante la transición, de 0 (solo el clip saliente) a 1 (solo el entrante), y conecta el clip saliente a **A** y el entrante a **B**. Aparece en Secuencia → Transición → «Efecto de Mis efectos».
+
+```glsl
+#effect Transición: barrido diagonal
+#desc Para Secuencia: barrido en diagonal con borde brillante
+#input A Saliente
+#input B Entrante
+
+#param progreso 0.5 0 1
+#param suavidad 0.08 0.01 0.5
+#color borde #ffffff
+
+float d = (@uv.x + @uv.y) * 0.5;
+float e = @progreso * (1.0 + 2.0 * @suavidad) - @suavidad;
+float m = smoothstep(e + @suavidad, e - @suavidad, d);
+float brillo = 1.0 - abs(m * 2.0 - 1.0);
+@out = mix(@A, @B, m);
+@out.rgb += @borde * brillo * 0.6;
+```
+
+Reglas:
+
+- Con `@progreso = 0` el resultado debe ser exactamente `@A`, y con `1` exactamente `@B`; si no, se nota un salto al empezar o terminar la transición.
+- Pon el nombre con el prefijo «Transición:» para que se distinga en el menú.
+- El valor inicial de `#param progreso` solo sirve para previsualizar el efecto en un nodo suelto; dentro de Secuencia lo controla ella.
+
+---
+
 ## 7. Combinar con otros nodos
 
 A veces es mejor armar un grafo que escribir código. Estos son los nodos nativos:
@@ -473,6 +503,7 @@ A veces es mejor armar un grafo que escribir código. Estos son los nodos nativo
 | Audio | — | Analiza un audio: capa con volumen, graves y agudos; espectro u onda. |
 | Recortar | Clip | Muestra el tramo entrada–salida del clip a partir del segundo «Empieza en»; fuera del rango, transparente, congelado o en bucle. |
 | Velocidad | Clip | Cambia la velocidad (negativa = reversa, 0 = congelado) desde un instante dado. |
+| Secuencia | Clip 1…8 | Une clips en orden con transición (corte, fundido, fundido a negro, cortinilla, deslizar, zoom, disolución o un efecto con `@progreso`). Une también el audio de los clips. |
 | Texto | — | Texto con fuente, contorno, sombra y animación de escritura, sobre fondo transparente (combínalo con Mezclar). |
 | Video | — | Carga un video (sin audio). |
 | Ruido | — | Ruido fractal, gris, color o vector; animable. |

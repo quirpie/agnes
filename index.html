@@ -376,6 +376,16 @@ void main(){vec2 g=vUv*uGrid,id=floor(g),f=fract(g)-.5,cuv=(id+.5)/uGrid;
  k=clamp(k+u_glow*smoothstep(.7,.97,texture(uLum,vUv).r),0.,1.);
  vec3 col=mix(u_bg,u_ink,k);float m=pick(texture(iB,vUv),uChB);
  outColor=vec4(mix(A(vUv).rgb,col,m),1.);}`;
+FS.trans=FS_HEAD+`uniform float u_p;uniform int u_mode;
+void main(){float p=clamp(u_p,0.,1.);vec2 uv=vUv;vec4 a=A(uv),b=B(uv),o;
+ if(u_mode==0)o=p<.5?a:b;
+ else if(u_mode==1)o=mix(a,b,p);
+ else if(u_mode==2)o=p<.5?vec4(a.rgb*(1.-2.*p),a.a):vec4(b.rgb*(2.*p-1.),b.a);
+ else if(u_mode==3){float m=smoothstep(uv.x-.03,uv.x+.03,p*1.06-.03);o=mix(a,b,m);}
+ else if(u_mode==4){float e=1.-p;o=uv.x<e?A(vec2(uv.x+p,uv.y)):B(vec2(uv.x-e,uv.y));}
+ else if(u_mode==5){vec4 za=A(.5+(uv-.5)/(1.+p*1.5)),zb=B(.5+(uv-.5)*(1.+(1.-p)*.6));o=mix(za,zb,smoothstep(.2,.8,p));}
+ else{float n=fbm(vec3(uv*vec2(uRes.x/uRes.y,1.)*5.,1.7),5);o=mix(a,b,smoothstep(n-.04,n+.04,p*1.1-.05));}
+ outColor=o;}`;
 FS.grade=FS_HEAD+`uniform float u_exposure,u_temp,u_tint,u_contrast,u_fade,u_sat,u_vib,u_shadowAmt,u_midAmt,u_highAmt;uniform vec3 u_shadow,u_mid,u_high;
 vec3 chroma(vec3 c){return c-vec3(luma(c));}
 void main(){vec4 src=A(vUv);vec3 c=src.rgb*exp2(u_exposure);
@@ -479,7 +489,8 @@ vec2 d = @uv - 0.5;
 const FIT={k:'fit',t:'enum',label:'Ajuste',opts:['Cubrir','Contener','Estirar'],v:0};
 const DEFS={
  image:{name:'Imagen',cat:'src',desc:'PNG, JPG…',inputs:[],params:[{k:'file',t:'file',label:'Archivo',accept:'image/*'},FIT],run:runSource},
- video:{name:'Video',cat:'src',desc:'MP4, WebM',inputs:[],params:[{k:'file',t:'file',label:'Archivo',accept:'video/*'},FIT],td:()=>true,run:runSource},
+ video:{name:'Video',cat:'src',desc:'MP4, WebM',inputs:[],params:[{k:'file',t:'file',label:'Archivo',accept:'video/*'},FIT,
+   {k:'audio',t:'bool',label:'Usar su audio',v:true},{k:'vol',t:'float',label:'Volumen',v:1,min:0,max:2}],td:()=>true,run:runSource},
  audio:{name:'Audio',cat:'src',desc:'volumen y frecuencias',inputs:[],run:runAudio,td:n=>!!n._abuf,params:[
    {k:'file',t:'file',label:'Archivo',accept:'audio/*,video/*'},
    {k:'gain',t:'float',label:'Ganancia',v:1,min:0,max:4},
@@ -525,6 +536,12 @@ const DEFS={
  speed:{name:'Velocidad',cat:'time',desc:'lenta, rápida o en reversa',inputs:[{k:'in',label:'Clip'}],run:runTimePass,td:()=>true,timeMap:speedMap,params:[
    {k:'speed',t:'float',label:'Velocidad (×)',v:1,min:-4,max:4,step:.01},
    {k:'from',t:'float',label:'Desde (s)',v:0,min:0,max:600,step:.01}]},
+ seq:{name:'Secuencia',cat:'time',desc:'une clips con transiciones',dynInputs:true,
+   inputs:[1,2,3,4,5,6,7,8].map(i=>({k:'c'+i,label:'Clip '+i})),run:runSeq,td:()=>true,childTimes:seqChildTimes,params:[
+   {k:'trans',t:'enum',label:'Transición',opts:['Corte','Fundido cruzado','Fundido a negro','Cortinilla','Deslizar','Zoom','Disolución con ruido','Efecto de Mis efectos'],v:1},
+   {k:'tdur',t:'float',label:'Duración transición (s)',v:.5,min:0,max:3,step:.01},
+   {k:'transfx',t:'fxpick',label:'Efecto de transición',v:''},
+   {k:'still',t:'float',label:'Duración de imágenes (s)',v:3,min:.1,max:60,step:.1}]},
  grade:{name:'Gradación',cat:'flt',desc:'corrección de color',fs:FS.grade,
    inputs:[{k:'in',label:'Entrada'},{k:'mask',label:'Máscara',kind:'scalar',white:true}],
    presets:{
@@ -594,7 +611,7 @@ function evalNode(n,t=T,stack=new Set()){
   if(stack.has(n.id))return BLACK;stack.add(n.id);
   const d=DEFS[n.type];
   const tin=d.timeMap?d.timeMap(n,t):t;
-  const ins=d.inputs.map(i=>{const s=byId(n.inputs[i.k]);return s&&tin!=null?evalNode(s,tin,stack):null;});
+  const ins=d.childTimes?[]:d.inputs.map(i=>{const s=byId(n.inputs[i.k]);return s&&tin!=null?evalNode(s,tin,stack):null;});
   stack.delete(n.id);
   const td=(d.td?d.td(n):false)||d.inputs.some(i=>{const s=byId(n.inputs[i.k]);return s&&s._td;})||hasLiveMod(n);
   n._td=td;
@@ -733,12 +750,50 @@ function trimMap(n,t){const p=n.p,a=Math.max(0,+p.tin||0),b=+p.tout||0,L=b>a?b-a
   return a+local;}
 function speedMap(n,t){return(+n.p.from||0)+t*(+n.p.speed);}
 function runTimePass(n,ins){if(ins[0])pass(FS.pass,n._out,P=>bindTex(P,'iA',0,ins[0]));else clearTarget(n._out);}
+/* ---- Duración de un clip, deducida del grafo ---- */
+function clipDuration(n,depth=0){
+  if(!n||depth>32)return null;const d=DEFS[n.type];
+  if(n.type==='video')return n._video&&n._video.duration>0?n._video.duration:null;
+  if(n.type==='trim'){const a=Math.max(0,+n.p.tin||0),b=+n.p.tout||0,st=Math.max(0,+n.p.start||0);
+    if(b>a)return st+b-a;const c=clipDuration(byId(n.inputs.in),depth+1);return c!=null?st+Math.max(0,c-a):null;}
+  if(n.type==='speed'){const c=clipDuration(byId(n.inputs.in),depth+1),sp=+n.p.speed,f=+n.p.from||0;
+    if(c==null||!sp)return null;return sp>0?Math.max(0,(c-f)/sp):f/(-sp);}
+  if(n.type==='seq')return seqLayout(n,depth+1).total;
+  for(const i of d.inputs){const c=clipDuration(byId(n.inputs[i.k]),depth+1);if(c!=null)return c;}
+  return null;}
+function seqLayout(n,depth=0){
+  const clips=[];for(const i of DEFS.seq.inputs){const c=byId(n.inputs[i.k]);if(!c)continue;
+    let d=clipDuration(c,depth+1);const known=d!=null&&d>0;if(!known)d=Math.max(.1,+n.p.still||3);clips.push({c,dur:d,known,k:i.k});}
+  const minD=clips.length?Math.min(...clips.map(x=>x.dur)):0,tr=clips.length>1?Math.min(Math.max(0,+n.p.tdur||0),minD*.5):0;
+  let st=0;for(const x of clips){x.start=st;st+=x.dur-tr;}
+  return{clips,tr,total:clips.length?clips[clips.length-1].start+clips[clips.length-1].dur:0};}
+/* Clips activos en t: [nodo, tiempo local, peso, progreso de la transición] */
+function seqChildTimes(n,t){
+  const L=seqLayout(n),out=[];
+  for(let i=0;i<L.clips.length;i++){const x=L.clips[i];if(t<x.start||t>=x.start+x.dur)continue;
+    const nx=L.clips[i+1];if(nx&&L.tr>0&&t>=nx.start){const p=(t-nx.start)/L.tr;out.push([x.c,t-x.start,1-p,p],[nx.c,t-nx.start,p,p]);}
+    else out.push([x.c,t-x.start,1,0]);
+    break;}
+  return out;}
+function runSeq(n,ins,d){
+  const act=seqChildTimes(n,ET);
+  if(!act.length){clearTarget(n._out);return;}
+  if(act.length===1){const tex=evalNode(act[0][0],act[0][1]);pass(FS.pass,n._out,P=>bindTex(P,'iA',0,tex));return;}
+  const a=evalNode(act[0][0],act[0][1]),b=evalNode(act[1][0],act[1][1]),pr=act[1][3],mode=n.p.trans|0;
+  if(mode===7){const fx=fxGet(n.p.transfx);
+    if(fx){let tn=n._tfx;if(!tn||tn.type!=='fx:'+fx.id)tn=n._tfx={type:'fx:'+fx.id,p:{},inputs:{},ch:{}};ensureSnippet(tn);
+      if(tn._prog){pass(tn._prog,n._out,P=>{bindTex(P,'iA',0,a);bindTex(P,'iB',1,b);bindTex(P,'iC',2,BLACK);
+        set1f(P,'uHasA',1);set1f(P,'uHasB',1);set1f(P,'uHasC',0);setParams(P,tn._params,tn.p,'$');set1f(P,'u_progreso',pr);});return;}}}
+  pass(FS.trans,n._out,P=>{bindTex(P,'iA',0,a);bindTex(P,'iB',1,b);set1f(P,'u_p',pr);set1i(P,'u_mode',mode===7?1:mode);});
+}
+const visibleInputs=(n,d)=>{if(!d.dynInputs)return d.inputs;let last=-1;d.inputs.forEach((i,j)=>{if(n.inputs[i.k])last=j;});return d.inputs.slice(0,Math.min(d.inputs.length,Math.max(2,last+2)));};
 /* Qué instante pide cada video para el tiempo t (recorre el grafo aplicando los nodos de tiempo) */
-function planVideoTimes(n,t,out=new Map(),depth=0){
-  if(!n||depth>64)return out;const d=DEFS[n.type];
-  if(n.type==='video'){if(!out.has(n.id))out.set(n.id,t);return out;}
+function planVideoTimes(n,t,out=new Map(),depth=0,w=1){
+  if(!n||depth>64||w<=0)return out;const d=DEFS[n.type];
+  if(n.type==='video'){const o=out.get(n.id);if(!o)out.set(n.id,{t,w});else o.w=Math.max(o.w,w);return out;}
+  if(d.childTimes){for(const[c,ct,cw]of d.childTimes(n,t))planVideoTimes(c,ct,out,depth+1,w*cw);return out;}
   const tt=d.timeMap?d.timeMap(n,t):t;if(tt==null)return out;
-  for(const i of d.inputs){const s=byId(n.inputs[i.k]);if(s)planVideoTimes(s,tt,out,depth+1);}
+  for(const i of d.inputs){const s=byId(n.inputs[i.k]);if(s)planVideoTimes(s,tt,out,depth+1,w);}
   return out;}
 const wrapT=(t,d)=>((t%d)+d)%d;
 /* ---- Texto: se dibuja con canvas 2D y se sube como textura (fondo transparente) ---- */
@@ -959,13 +1014,14 @@ function subtitle(n){
   if(n.type==='noise')return n.p.speed>0?'fbm animado':'fbm';
   if(n.type==='ramp')return DEFS.ramp.params[0].opts[n.p.mode|0];
   if(n.type==='trim'){const p=n.p,f=x=>(+x).toFixed(2).replace(/\.00$/,'');return `${f(p.tin)}–${+p.tout>+p.tin?f(p.tout):'fin'} s · en ${f(p.start)} s`;}
+  if(n.type==='seq'){const L=seqLayout(n);return `${L.clips.length} clip${L.clips.length===1?'':'s'} · ${fmtTime(L.total)}`;}
   if(n.type==='speed')return `${(+n.p.speed).toFixed(2).replace(/\.?0+$/,'')}×${+n.p.speed<0?' (reversa)':+n.p.speed===0?' (congelado)':''}`;
   if(n.type==='text'){const l=String(n.p.text||'').split('\n')[0];return l?'«'+l.slice(0,22)+(l.length>22?'…':'')+'»':'(vacío)';}
   if(DEFS[n.type]&&DEFS[n.type].fx)return DEFS[n.type].desc||'Efecto';
   return '';
 }
 function nodeHTML(n){const d=DEFS[n.type];
-  const ports=d.inputs.map(i=>`<div class="port in${i.kind==='scalar'?' sc':''}${n.inputs[i.k]&&byId(n.inputs[i.k])?' on':''}" data-k="${i.k}"><i></i><span>${esc(i.label)}</span>${i.kind==='scalar'?`<b>${'LRGBA'[n.ch[i.k]||0]}</b>`:''}</div>`).join('');
+  const ports=visibleInputs(n,d).map(i=>`<div class="port in${i.kind==='scalar'?' sc':''}${n.inputs[i.k]&&byId(n.inputs[i.k])?' on':''}" data-k="${i.k}"><i></i><span>${esc(i.label)}</span>${i.kind==='scalar'?`<b>${'LRGBA'[n.ch[i.k]||0]}</b>`:''}</div>`).join('');
   return `<div class="nh"><span class="cat"></span><span class="nt">${esc(d.name)}</span><button class="eye" title="Mostrar en el visor">${ICON.eye}</button></div>
   <div class="nb">${ports}${!ports||d.cat==='time'?`<div class="sub">${esc(subtitle(n))}</div>`:''}</div><div class="port out"><i></i></div>`;}
 function renderGraph(){
@@ -1099,6 +1155,8 @@ function ctrlHTML(q,v,key,n){const lab=`<label title="${esc(q.label||q.k)}">${es
   if(q.t==='enum')return `<div class="row wide">${lab}<select data-k="${key}">${q.opts.map((o,i)=>`<option value="${i}"${(v|0)===i?' selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
   if(q.t==='bool')return `<div class="row wide">${lab}<input type="checkbox" data-k="${key}"${v?' checked':''}></div>`;
   if(q.t==='color')return `<div class="row wide">${lab}<input type="color" data-k="${key}" value="${esc(v)}"></div>`;
+  if(q.t==='fxpick'){const list=FX.filter(e=>/@progreso\b/.test(e.code));
+    return `<div class="row wide">${lab}<select data-k="${key}"><option value="">${list.length?'(elige un efecto)':'(ninguno con @progreso)'}</option>${list.map(e=>`<option value="${esc(e.id)}"${e.id===v?' selected':''}>${esc(e.name)}</option>`).join('')}</select></div>`;}
   if(q.t==='text')return `<div class="row wide" style="align-items:start">${lab}<textarea class="ptext" data-k="${key}" rows="2" spellcheck="false">${esc(v)}</textarea></div>`;
   return '';}
 function fileHTML(n,q){return `<div class="row wide"><label>${esc(q.label)}</label><div style="display:flex;gap:8px;align-items:center;min-width:0"><span class="filepick"><button tabindex="-1">Elegir…</button><input type="file" data-fileinput accept="${q.accept}" title="Elegir archivo"></span><span class="fname">${esc(n._fileName||(n.type==='image'?'Patrón de prueba':'Ninguno'))}</span></div></div>`;}
@@ -1108,8 +1166,11 @@ function renderParams(){
   const d=DEFS[n.type];if(isCodeNode(n))ensureSnippet(n);
   let h=`<div class="ph"><span class="cat" style="--c:var(--${d.cat})"></span><span class="t">${esc(d.name)}</span><button class="icon" data-act="disp" title="Mostrar en el visor">${ICON.eye}</button><button class="icon" data-act="del" title="Eliminar nodo">${ICON.trash}</button><button class="icon mob" data-act="col">${ICON.chev}</button></div><div class="pb">`;
   if(d.inputs.length){h+=`<div class="sec">Entradas</div>`;
-    for(const i of d.inputs){const s=byId(n.inputs[i.k]);
+    for(const i of visibleInputs(n,d)){const s=byId(n.inputs[i.k]);
       h+=`<div class="inrow"><label>${esc(i.label)}</label><span class="src${s?'':' none'}">${s?'← '+esc(DEFS[s.type].name):(i.white?'sin conexión (= 1)':'sin conexión')}</span>${i.kind==='scalar'?`<select data-ch="${i.k}" title="Canal que se usa como atributo">${CH.map((c,j)=>`<option value="${j}"${(n.ch[i.k]||0)===j?' selected':''}>${c}</option>`).join('')}</select>`:''}</div>`;}}
+  if(n.type==='seq'){const L=seqLayout(n);fitProjectTo(L.total);
+    h+=`<div class="sec">Clips · total ${fmtTime(L.total)}</div>`+(L.clips.length?L.clips.map((x,j)=>`<div class="inrow"><label>${j+1}. ${esc(DEFS[x.c.type].name)}</label><span class="src">${fmtTime(x.start)} → ${fmtTime(x.start+x.dur)} <span style="color:var(--mute)">(${x.dur.toFixed(2)} s${x.known?'':', fija'})</span></span></div>`).join(''):`<div class="note" style="color:var(--mute);font-size:12px">Conecta clips a las entradas: se reproducen en orden.</div>`)+
+      `<div class="fxbtns"><button data-act="seqfit">Ajustar proyecto a la secuencia</button></div>`;}
   const ps=d.params.filter(q=>q.t!=='code');
   if(ps.length){h+=`<div class="sec">Parámetros</div>`;for(const q of ps)h+=q.t==='file'?fileHTML(n,q):ctrlHTML(q,n.p[q.k],q.k,n.type==='audio'?null:n);}
   if(n.type==='snippet'){h+=`<div class="sec">Código</div><textarea class="code" data-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off">${esc(n.p.code)}</textarea><div id="snipStatus"></div><div id="snipParams"></div>
@@ -1151,13 +1212,13 @@ paramsEl.addEventListener('input',e=>{
   const k=t.dataset.k;if(!k)return;const q=findParam(n,k);if(!q)return;let v;
   if(q.t==='float'||q.t==='int'){v=parseFloat(t.value);if(isNaN(v))return;if(q.t==='int')v=Math.round(v);
     const sib=t.parentNode.querySelector(t.type==='range'?'input[type=number]':'input[type=range]');if(sib)sib.value=t.type==='range'?+v.toFixed(4):v;}
-  else if(q.t==='enum')v=+t.value;else if(q.t==='bool')v=t.checked;else if(q.t==='color'||q.t==='text')v=t.value;else return;
+  else if(q.t==='enum')v=+t.value;else if(q.t==='bool')v=t.checked;else if(q.t==='color'||q.t==='text'||q.t==='fxpick')v=t.value;else return;
   if(k==='preset'&&DEFS[n.type].presets){const pr=DEFS[n.type].presets[q.opts[v]];
     if(pr){DEFS[n.type].params.forEach(x=>{if(x.k!=='preset'&&x.v!==undefined)n.p[x.k]=x.v;});Object.assign(n.p,pr);}
     n.p.preset=v;invalidate(n);scheduleSave();renderParams();return;}
   n.p[k]=v;invalidate(n);scheduleSave();
   if(n.type==='audio'&&k==='monitor'&&n._audio)n._audio.volume=clamp(v,0,1);
-  if(['image','video','audio','noise','ramp','text','trim','speed'].includes(n.type)){const sub=nodeEls[n.id]&&nodeEls[n.id].querySelector('.sub');if(sub)sub.textContent=subtitle(n);}
+  if(['image','video','audio','noise','ramp','text','trim','speed','seq'].includes(n.type)){const sub=nodeEls[n.id]&&nodeEls[n.id].querySelector('.sub');if(sub)sub.textContent=subtitle(n);}
 });
 paramsEl.addEventListener('keydown',e=>{if(e.key==='Tab'&&e.target.dataset.code!==undefined){e.preventDefault();const t=e.target,s=t.selectionStart;
   t.setRangeText('  ',s,t.selectionEnd,'end');t.dispatchEvent(new Event('input',{bubbles:true}));}});
@@ -1173,6 +1234,7 @@ paramsEl.addEventListener('click',e=>{
   else if(b.dataset.act==='fxedit'){const fx=fxGet(DEFS[n.type].fx);if(!fx)return;const src=n.inputs;selId=null;addNode('snippet');const m=byId(selId);
     m.p.code=fx.code;m._code=null;Object.assign(m.inputs,src);invalidate(m);renderGraph();renderParams();scheduleSave();toast('Edita y guarda con el mismo nombre para actualizar el efecto',true);}
   else if(b.dataset.act==='fxlib')openFx();
+  else if(b.dataset.act==='seqfit'){const L=seqLayout(n);if(L.total>0){setProjDur(L.total);toast('Proyecto: '+fmtTime(L.total),true);}}
   else if(b.dataset.mod!==undefined||b.dataset.modoff!==undefined){
     const key=b.dataset.mod!==undefined?b.dataset.mod:b.closest('.modrow').dataset.modk;
     if(n.mod&&n.mod[key]){delete n.mod[key];if(!Object.keys(n.mod).length)delete n.mod;}
@@ -1204,8 +1266,11 @@ function loadImage(n,f){
 }
 function loadVideo(n,f){
   if(n._video){n._video.pause();URL.revokeObjectURL(n._video.src);}
+  n._vabuf=null;
+  f.arrayBuffer().then(buf=>{const ac=getAC();if(!ac)return null;return new Promise((res,rej)=>{const pr=ac.decodeAudioData(buf,res,rej);if(pr&&pr.then)pr.then(res,rej);});})
+    .then(ab=>{n._vabuf=ab||null;}).catch(()=>{n._vabuf=null;});
   const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';
-  v.src=URL.createObjectURL(f);v.addEventListener('loadeddata',()=>{invalidate(n);fitProjectTo(v.duration);});v.addEventListener('seeked',()=>{if(!playing)invalidate(n);});v.onerror=()=>toast('No se pudo abrir ese video');
+  v.src=URL.createObjectURL(f);v.addEventListener('loadeddata',()=>{invalidate(n);fitProjectTo(v.duration);nodes.forEach(m=>{if(m.type==='seq')invalidate(m);});renderGraph();if(selId&&byId(selId)&&byId(selId).type==='seq')renderParams();});v.addEventListener('seeked',()=>{if(!playing)invalidate(n);});v.onerror=()=>toast('No se pudo abrir ese video');
   n._video=v;n._fileName=f.name;if(playing)v.play().catch(()=>{});else v.load();renderGraph();renderParams();
 }
 
@@ -1259,11 +1324,15 @@ scrub.addEventListener('input',()=>{scrubbing=true;seekTo(+scrub.value);});
 ['pointerup','change','pointercancel'].forEach(ev=>scrub.addEventListener(ev,()=>{scrubbing=false;}));
 /* Videos en la vista previa: siguen al instante que pide el grafo (velocidad, reversa, recortes) */
 function syncVideos(dt){
-  for(const n of nodes){const v=n._video;if(!v||n._reqT==null||!(v.duration>0))continue;
-    const want=wrapT(n._reqT,v.duration),prev=n._prevReq;n._prevReq=want;
+  const disp=byId(displayId),plan=disp&&!exporting?planVideoTimes(disp,T):new Map();
+  for(const n of nodes){const v=n._video;if(!v||!(v.duration>0))continue;const pl=plan.get(n.id);
+    if(!pl){if(!v.paused)v.pause();n._prevReq=null;continue;}
+    const vol=n.p.audio?clamp(pl.w*(+n.p.vol),0,1):0;if(Math.abs(v.volume-vol)>.01)v.volume=vol;
+    const wantMuted=vol<=0||!playing;if(v.muted!==wantMuted)v.muted=wantMuted;
+    const want=wrapT(pl.t,v.duration),prev=n._prevReq;n._prevReq=want;
     if(playing&&!scrubbing&&prev!=null&&dt>0){const rate=(want-prev)/dt;
       if(rate>.2&&rate<4.5){const r=clamp(Math.round(rate*20)/20,.25,4);if(Math.abs(v.playbackRate-r)>.01)v.playbackRate=r;
-        if(v.paused)v.play().catch(()=>{});if(!v.seeking&&Math.abs(v.currentTime-want)>.3)v.currentTime=want;continue;}}
+        if(v.paused)v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});});if(!v.seeking&&Math.abs(v.currentTime-want)>.3)v.currentTime=want;continue;}}
     if(!v.paused)v.pause();
     if(!v.seeking&&Math.abs(v.currentTime-want)>.015)v.currentTime=want;}
 }
@@ -1354,21 +1423,39 @@ function buildMP4(w,h,fps,desc,samples,audio){
   return new Blob([ftyp,mv,mdatH,...samples.map(s=>s.data),...(audio?audio.chunks.map(c=>c.data):[])],{type:'video/mp4'});
 }
 /* Codifica el audio del nodo Audio (en bucle) para la duración exportada. AAC si se puede; si no, Opus. */
-async function encodeAudioTrack(buf,dur){
-  if(typeof AudioEncoder!=='function'||typeof AudioData!=='function'||typeof OfflineAudioContext!=='function')return null;
-  const ch=Math.min(2,buf.numberOfChannels),sr=48000;let cfg=null;
+/* Mezcla final: música de los nodos Audio (en bucle) + audio de cada clip siguiendo su tiempo
+   (recortes, velocidad, reversa) y su peso en las transiciones */
+function buildAudioMix(N,fps,plans){
+  const sr=48000,len=Math.max(1,Math.round(N/fps*sr)),L=new Float32Array(len),Rt=new Float32Array(len);let any=false;
+  const read=(b,ch0,ch1,t)=>{const pos=wrapT(t,b.duration)*b.sampleRate,k=Math.floor(pos),f=pos-k,k1=Math.min(k+1,ch0.length-1);
+    return[ch0[k]*(1-f)+ch0[k1]*f,ch1[k]*(1-f)+ch1[k1]*f];};
+  for(const a of nodes){if(a.type!=='audio'||!a._abuf)continue;any=true;const b=a._abuf,c0=b.getChannelData(0),c1=b.numberOfChannels>1?b.getChannelData(1):c0;
+    for(let j=0;j<len;j++){const v=read(b,c0,c1,j/sr);L[j]+=v[0];Rt[j]+=v[1];}}
+  const spf=sr/fps;
+  for(let i=0;i<N;i++){const pl=plans[i],nx=plans[i+1];if(!pl)continue;
+    for(const[id,o]of pl){const n=byId(id);if(!n||!n.p.audio||!n._vabuf)continue;any=true;
+      const b=n._vabuf,c0=b.getChannelData(0),c1=b.numberOfChannels>1?b.getChannelData(1):c0,g=o.w*(+n.p.vol);
+      const on=nx&&nx.get(id);let rate=on?(on.t-o.t)*fps:1;if(Math.abs(rate)>8)rate=1;
+      const j0=Math.round(i*spf),j1=Math.min(len,Math.round((i+1)*spf));
+      for(let j=j0;j<j1;j++){const v=read(b,c0,c1,o.t+(j-j0)/sr*rate);L[j]+=g*v[0];Rt[j]+=g*v[1];}}}
+  if(!any)return null;
+  for(let j=0;j<len;j++){L[j]=clamp(L[j],-1,1);Rt[j]=clamp(Rt[j],-1,1);}
+  return{sr,planes:[L,Rt],len};
+}
+async function encodeAudioTrack(mix){
+  if(!mix||typeof AudioEncoder!=='function'||typeof AudioData!=='function')return null;
+  const ch=2,sr=mix.sr;let cfg=null;
   for(const c of[{codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ch,bitrate:160000},{codec:'opus',sampleRate:sr,numberOfChannels:ch,bitrate:128000}]){
     try{const r=await AudioEncoder.isConfigSupported(c);if(r&&r.supported){cfg=c;break;}}catch(_){}}
   if(!cfg)return null;
-  const len=Math.max(1,Math.round(dur*sr)),oac=new OfflineAudioContext(ch,len,sr),src=oac.createBufferSource();
-  src.buffer=buf;src.loop=true;src.connect(oac.destination);src.start(0);const out=await oac.startRendering();
+  const len=mix.len;
   const isAac=cfg.codec!=='opus',chunks=[];let desc=null,err=null;
   const enc=new AudioEncoder({output:(c,meta)=>{const d=meta&&meta.decoderConfig&&meta.decoderConfig.description;
       if(d&&!desc)desc=d instanceof ArrayBuffer?new Uint8Array(d.slice(0)):new Uint8Array(d.buffer.slice(d.byteOffset,d.byteOffset+d.byteLength));
       const b=new Uint8Array(c.byteLength);c.copyTo(b);chunks.push({data:b,samples:c.duration?Math.round(c.duration*sr/1e6):(isAac?1024:960)});},
     error:e=>{err=e;}});
   try{enc.configure(cfg);}catch(_){return null;}
-  const planes=[...Array(ch)].map((_,c)=>out.getChannelData(c)),F=1024;
+  const planes=mix.planes,F=1024;
   for(let i=0;i<len;i+=F){if(exporting&&exporting.cancel)break;const nf=Math.min(F,len-i),data=new Float32Array(nf*ch);
     for(let c=0;c<ch;c++)data.set(planes[c].subarray(i,i+nf),c*nf);
     const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:nf,numberOfChannels:ch,timestamp:Math.round(i*1e6/sr),data});
@@ -1383,7 +1470,7 @@ async function encodeAudioTrack(buf,dur){
 }
 async function seekVideos(plan,fps){
   const jobs=[];
-  for(const[id,t]of plan){const n=byId(id),v=n&&n._video;if(!v||v.readyState<1||!(v.duration>0))continue;
+  for(const[id,o]of plan){const t=o.t,n=byId(id),v=n&&n._video;if(!v||v.readyState<1||!(v.duration>0))continue;
     const tt=Math.min(wrapT(t+.5/fps,v.duration),Math.max(0,v.duration-.5/fps));
     jobs.push(new Promise(res=>{let done=false,seeked=false,framed=typeof v.requestVideoFrameCallback!=='function';
       const fin=()=>{if(!done){done=true;clearTimeout(to);res();}};const to=setTimeout(fin,4000);
@@ -1414,11 +1501,11 @@ async function renderOffline(){
   exporting={cancel:false};nodes.forEach(n=>{if(n._video)n._video.pause();if(n._audio)n._audio.pause();});viewCh=0;
   expPrev.innerHTML='';expProg.hidden=false;expProg.firstElementChild.style.width='0';
   expRec.textContent='Cancelar';expRec.classList.remove('primary');
-  const t0=performance.now();
+  const t0=performance.now(),plans=[];
   try{
     for(let i=0;i<N;i++){
       if(exporting.cancel||encErr)break;
-      T=i/fps;FRAME++;await seekVideos(planVideoTimes(byId(displayId),T),fps);
+      T=i/fps;FRAME++;const plan=planVideoTimes(byId(displayId),T);plans.push(plan);await seekVideos(plan,fps);
       const dn=byId(displayId);if(!dn)break;const tex=evalNode(dn);
       pass(EXPORT_FS,null,P=>bindTex(P,'uTex',0,tex));
       const fr=new VideoFrame(canvas,{timestamp:Math.round(i*1e6/fps),duration:Math.round(1e6/fps)});
@@ -1436,9 +1523,10 @@ async function renderOffline(){
   expRec.textContent='Grabar video';expRec.classList.add('primary');
   if(cancelled){expMsg.textContent='Exportación cancelada.';expProg.hidden=true;return;}
   if(encErr||!desc||!samples.length){expMsg.textContent='Falló la codificación'+(encErr?': '+(encErr.message||encErr):'')+'.';return;}
-  let audio=null;const an=nodes.find(x=>x.type==='audio'&&x._abuf);
-  if(an){expMsg.textContent='Codificando el audio…';exporting={cancel:false};
-    try{audio=await encodeAudioTrack(an._abuf,N/fps);}catch(_){audio=null;}
+  let audio=null;plans.push(planVideoTimes(byId(displayId),N/fps));
+  const mix=buildAudioMix(N,fps,plans),an=!!mix;
+  if(mix){expMsg.textContent='Codificando el audio…';exporting={cancel:false};
+    try{audio=await encodeAudioTrack(mix);}catch(_){audio=null;}
     const c=exporting.cancel;exporting=null;if(c){expMsg.textContent='Exportación cancelada.';expProg.hidden=true;return;}}
   window.__agnes&&(window.__agnes.lastExport={W,H,fps,desc,samples});
   offer(buildMP4(W,H,fps,desc,samples,audio),`agnes-${stamp()}.mp4`,'vid');
@@ -1457,8 +1545,8 @@ function stamp(){const d=new Date(),z=v=>String(v).padStart(2,'0');return`${d.ge
 function openExport(){
   const mm=pickMime();const vids=nodes.filter(n=>n._video&&isFinite(n._video.duration));
   $('#expPhotoNote').textContent=`Fotograma actual del nodo que está en el visor, a ${W}×${H}.`;
-  const hasAud=nodes.some(x=>x.type==='audio'&&x._abuf);
-  $('#expVidNote').textContent=hasWC?`Se renderiza cuadro por cuadro desde 0 s, a ${W}×${H}, en MP4. Sale fluido aunque tarde más que la duración. ${hasAud?'Incluye el audio del nodo Audio.':'Sin audio (agrega un nodo Audio para incluirlo).'}`:
+  const hasAud=nodes.some(x=>(x.type==='audio'&&x._abuf)||(x.type==='video'&&x._vabuf&&x.p.audio));
+  $('#expVidNote').textContent=hasWC?`Se renderiza cuadro por cuadro desde 0 s, a ${W}×${H}, en MP4. Sale fluido aunque tarde más que la duración. ${hasAud?'Incluye el audio (nodos Audio y sonido de los videos).':'Sin audio.'}`:
     mm?`Se graba en tiempo real desde 0 s, a ${W}×${H}, en ${mm.ext.toUpperCase()}. Sin audio. Deja la pantalla encendida mientras graba.`:'Este navegador no puede grabar video.';
   let opts=[2,5,10,15,30].map(v=>`<option value="${v}">${v} s</option>`).join('');
   if(vids.length){const dv=Math.max(...vids.map(n=>n._video.duration));opts=`<option value="${dv}">Duración del video (${dv.toFixed(1)} s)</option>`+opts;}
@@ -1539,7 +1627,7 @@ if(window.matchMedia('(max-width:760px)').matches)paramsEl.classList.add('collap
 requestAnimationFrame(()=>{fitView();requestAnimationFrame(loop);});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{uploadTex(DEFAULT_IMG,patternCanvas());nodes.forEach(n=>{if(n.type==='image'&&!n._own)invalidate(n);});renderGraph();});
 initExport();initFx();
-window.__agnes={nodes:()=>nodes,evalNode,planVideoTimes,seekTo,get T(){return T;},buildMP4,audioAt,splitGlobals,FX:()=>FX,importText,parseMeta,DEFS,compile,FS,buildSnippet};
+window.__agnes={nodes:()=>nodes,renderGraph:()=>renderGraph(),seqLayout,clipDuration,evalNode,planVideoTimes,seekTo,get T(){return T;},buildMP4,audioAt,splitGlobals,FX:()=>FX,importText,parseMeta,DEFS,compile,FS,buildSnippet};
 })();
 </script>
 </body>
